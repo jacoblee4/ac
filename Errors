@@ -1,0 +1,179 @@
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_sensitive_commercial = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [PCI] No or field empty. PCI fields will be 0.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [GLBA Section] Data Type = 4
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: ======== PROCESSING COMPLETE ========
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_glba = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [pci_data] = '0'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ----------------------------------------
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: Processing Business App: 76d7f04adb8b5b8071cc71fa8c961933
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [HIPAA] No or field empty. HIPAA field will be 0.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_hipaa_hitech = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [Employee Info Section] sensitive2_employee_info = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: Found 1 business app(s) to process
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [hipaa_hitech_data] = '0'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_pci = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [sensitive2_employee_info] = '0'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [HIPAA] No or field empty. HIPAA field will be 0.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: ======== PROCESSING COMPLETE ========
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_sensitive = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [PCI Section] pci_data = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: save=false, appID=undefined
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [hipaa_hitech_data] = '0'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ○ Business app record NOT saved (preview mode or different appID)
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: FINAL VALUES for Business App 76d7f04adb8b5b8071cc71fa8c961933:
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ========================================
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [GLBA Section] Data Type = 4
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ----------------------------------------
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [Employee Info] No or field empty. Sensitive field not updated from this section.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ========================================
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: Final answers object: {"76d7f04adb8b5b8071cc71fa8c961933":{"u_glba":0,"u_sensitive":0,"u_sensitive_commercial":0,"u_pci":0,"u_hipaa_hitech":0}}
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_sensitive = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [PCI Section] pci_data = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: save=true, appID=76d7f04adb8b5b8071cc71fa8c961933
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [glba_data_type] = '4'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ✓ Business app record UPDATED in database
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: FINAL VALUES for Business App 76d7f04adb8b5b8071cc71fa8c961933:
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ========================================
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ----------------------------------------
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [Employee Info] No or field empty. Sensitive field not updated from this section.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ========================================
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [HIPAA Section] hipaa_hitech_data = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_pci = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [sensitive2_employee_info] = '0'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [GLBA] NONE selected. GLBA and Sensitive fields will be 0.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: Final answers object: {"76d7f04adb8b5b8071cc71fa8c961933":{"u_glba":0,"u_sensitive":0,"u_sensitive_commercial":0,"u_pci":0,"u_hipaa_hitech":0}}
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_sensitive_commercial = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [PCI] No or field empty. PCI fields will be 0.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [HIPAA Section] hipaa_hitech_data = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: Reason: save=false, appID=undefined, current businessApp=76d7f04adb8b5b8071cc71fa8c961933
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_glba = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [pci_data] = '0'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: Starting processing for instance: 33bf7f731bc936d04726c9d6624bcb0e
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [GLBA] NONE selected. GLBA and Sensitive fields will be 0.
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: Starting processing for instance: 33bf7f731bc936d04726c9d6624bcb0e
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: ----------------------------------------
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: Processing Business App: 76d7f04adb8b5b8071cc71fa8c961933
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [glba_data_type] = '4'
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: u_hipaa_hitech = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC: [Employee Info Section] sensitive2_employee_info = 0
+
+11-18-2025 16:44:45
+Information	*** Script	ACDC Assessment: Found 1 business app(s) to process
+
+11-18-2025 16:44:44
+Information	ENGINE	terminating ACDC assessment email escalation, state: cancelled
