@@ -1,0 +1,533 @@
+var hgcCiItemsUtils = Class.create();
+hgcCiItemsUtils.prototype = Object.extendsObject(AbstractAjaxProcessor, {
+	RISKGOV: "b04dbf9cdbcfb340575ff3d51d961942",
+	CONTINUITYGOV: "904dbf9cdbcfb340575ff3d51d961901",
+	IAMGOV: "144dbf9cdbcfb340575ff3d51d961906",
+	PRBMANAGERS: "e6095e01db2e574071cc71fa8c961959",
+	ONBOARDINGSUPPORT: "22095e01db2e574071cc71fa8c961955",
+	ENTARCHITECTURE: "",
+
+	userCanEditOwners: function(){
+		return gs.getUser().hasRole("ecmdb_admin") || gs.getUser().isMemberOf("b04dbf9cdbcfb340575ff3d51d961942");
+	},
+
+	getFieldsFromCI: function(currentID, fields){
+		currentID = currentID || this.getParameter('sysparm_currentID') || '';
+		fields = fields || JSON.parse(this.getParameter("sysparm_fields") || "[]");
+
+		var current = new GlideRecordUtil().getGR("cmdb_ci", currentID);
+		var rFields = {};
+		
+		fields.forEach(function(field){
+			rFields[field] = current.getValue(field);
+		});
+		
+		return JSON.stringify(rFields);
+		
+	},
+
+	sendACDC: function(currentID){
+		currentID = currentID || this.getParameter('sysparm_currentID') || '';
+
+		var current = new GlideRecordUtil().getGR("cmdb_ci", currentID);
+
+		var assessmentType = "aa949a5adb161810100a278115961941";
+		var userField = "owned_by";
+
+		if(current.getValue("u_critical_application_risk") == "Yes" && current.getValue("u_information_owner")){
+			userField = "u_information_owner";
+		}
+
+		var id = new global.AssessmentUtils().createAssessments(assessmentType, current.getUniqueValue(), current.getValue(userField), "");
+		gs.addInfoMessage('The Application Check for Data Classification assessment has been sent to ' + current.getDisplayValue(userField) + '.');
+		return id;
+	},
+
+	sendSelfACDC: function(currentID, currentUser){
+		currentID = currentID || this.getParameter('sysparm_currentID') || '';
+
+		var current = new GlideRecordUtil().getGR("cmdb_ci", currentID);
+
+		var assessmentType = "aa949a5adb161810100a278115961941";
+
+		var id = new global.AssessmentUtils().createAssessments(assessmentType, current.getUniqueValue(), currentUser, "");
+		gs.addInfoMessage('The Application Check for Data Classification assessment has been sent to you');
+		return id;
+	},
+
+	forceSaveOwners: function(user, currentID){
+
+		user = user || this.getParameter('sysparm_user') || '';
+		currentID = currentID || this.getParameter('sysparm_currentID') || '';
+
+		var grCCBA = new GlideRecord('cmdb_ci_business_app');
+		if(this.userCanEditOwners() && grCCBA.get(currentID)){
+
+			var field = "owned_by";
+			if(grCCBA.u_critical_application_risk == "Yes"){
+				field = "u_information_owner";
+			}
+
+			grCCBA.setValue(field, user);
+			grCCBA.update();
+
+			var id = new AssessmentUtils().createAssessments("968f7690db645810466f5099dc961900", grCCBA.getUniqueValue(), grCCBA.getValue(field));
+			if(id)
+				gs.addInfoMessage("Assessment created and sent to " + grCCBA[field].getDisplayValue());
+			else
+				gs.addErrorMessage("Assessment not created, an error has occured, contact the ServiceNow administrator");
+		}
+
+	},
+
+	getBusinessAppCriticalFields: function(){
+		var grSD = new GlideRecord('sys_dictionary');
+		grSD.addEncodedQuery("nameSTARTSWITHcmdb_ci_business_app^attributesLIKEcritical_ci_field=true");
+		grSD.query();
+
+		var elements = [];
+
+		while(grSD.next()){
+			elements.push(grSD.getValue("element"));
+		}
+
+		return JSON.stringify(elements);
+	},
+
+	getBrmUsers: function(){
+		var grSUHR = new GlideRecord('sys_user_has_role');
+		grSUHR.addEncodedQuery("role=364bc005dbdc445032049447db9619b9");
+		grSUHR.query();
+		var ids = [];
+		var user = "";
+		while (grSUHR.next()) {
+			user = grSUHR.getValue('user');
+			if(!~ids.indexOf(user )){
+				ids.push(user);
+			}
+		}
+
+		return ids.join(',');
+	},
+
+	getParameterValue: function(name, url) {  
+		name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");  
+		var regexS = "[\\?&]" + name + "=([^&#]*)";  
+		var regex = new RegExp(regexS);  
+		var results = regex.exec(url);  
+		if (results == null) {  
+			return "";  
+		} else {  
+			return unescape(results[1]);  
+		} 
+	},
+	
+	isAppCritical: function(appId) {
+		appId = appId || this.getParameter('sysparm_appId');
+		var grApp = new GlideRecord('cmdb_ci_business_app');
+		if (grApp.get(appId)) {
+			return (!grApp.u_critical_application_risk || grApp.u_critical_application_risk == 'No') ? false : true;
+		} else {
+			gs.addErrorMessage("Could not find the Business Application from the given SysID");
+		}
+	},
+
+	createChecksumMD5: function(text){
+		text = text || this.getParameter('sysparm_text') || '';
+		gs.include("cryptojs");
+		return CryptoJS.MD5(text+"nope").toString();
+	},
+
+	getProperty: function(propName){
+		propName = propName || this.getParameter('sysparm_prop_name') || '';
+		return gs.getProperty(propName, false);
+	},
+
+	createTaskFields: function(eventName, record, param1, param2){
+
+		eventName = eventName || this.getParameter('sysparm_event_name') || '';
+		record = record || this.getParameter('sysparm_record_id') || '';
+		param1 = param1 || this.getParameter('sysparm_param1') || '';
+		param2 = param2 || this.getParameter('sysparm_param2') || '';
+
+		var table = this.getParameter('sysparm_record_table');
+
+		if(table){
+			record = new GlideRecord(table);
+			record.get(this.getParameter('sysparm_record_id') || '');
+		}
+
+		var grTask = new GlideRecord('sc_task');
+		grTask.initialize();
+
+		grTask.cmdb_ci = record.sys_id;
+		grTask.assignment_group = param2;
+
+		grTask.setValue("short_description", "Field Validation requested on " + grTask.cmdb_ci.getDisplayValue() + " for " + grTask.assignment_group.getDisplayValue());
+
+		var desc = "Please verify and update the configuration item following the link in the email sent to you.";
+		desc += "\nYou may also find the link in the activity feed in the email";
+
+		grTask.setValue("description", desc);		
+
+		var taskId = grTask.insert();
+
+		var fields = [
+			{"name": "question", "value": "ff34ff26dbe0845032049447db9619f6"},
+			{"name": "table_sys_id", "value": taskId},
+			{"name": "table_name", "value": grTask.getTableName()},
+			{"name": "value", "value": param1},
+			{"name": "order", "value": 100},
+		];
+
+		var grQA = new GlideRecord('question_answer');
+		grQA.initialize();
+
+		fields.forEach(function(el){
+			grQA.setValue(el.name, el.value);
+		});
+
+		grQA.insert();
+
+		function getWorkflowIdFromName(name){
+			var wflw = new Workflow();
+			return wflw.getWorkflowFromName(name).toString();
+		}
+
+		function getVars(gr) {
+			var vars = {};
+			for (var key in gr.variables )
+				vars[key] = gr.variables[key];
+			return vars;
+		}
+
+		var gr = new GlideRecord("task");
+		gr.get(taskId);
+
+		//attach wf
+		var dw = new Workflow();
+		var dw_context = dw.startFlow(getWorkflowIdFromName('request_ci_update'), gr, gr.operation(), getVars(gr));
+
+		gs.addInfoMessage("Event created for " + grTask.assignment_group.getDisplayValue());
+
+	},
+
+	sendEvent: function(eventName, record, param1, param2){
+		eventName = eventName || this.getParameter('sysparm_event_name') || '';
+		record = record || this.getParameter('sysparm_record_id') || '';
+		param1 = param1 || this.getParameter('sysparm_param1') || '';
+		param2 = param2 || this.getParameter('sysparm_param2') || '';
+
+		var table = this.getParameter('sysparm_record_table');
+
+		if(table){
+			record = new GlideRecord(table);
+			record.get(this.getParameter('sysparm_record_id') || '');
+		}
+
+		gs.eventQueue(eventName, record, param1, param2);
+	},
+
+	getMissingSections: function(sectionsName, tableName, viewName){
+		viewName = viewName || this.getParameter('sysparm_view') || '';
+		tableName = tableName || this.getParameter('sysparm_table') || '';
+		sectionsName = sectionsName || this.getParameter('sysparm_sections') || '';
+
+		var sections = [];
+
+		var grSysUiSection = new GlideRecord('sys_ui_section');
+		grSysUiSection.addEncodedQuery("view=" + (viewName || "Default view") + "^name=" + tableName);
+
+		sectionsName.forEach(function(sectionCaption){
+			grSysUiSection.addQuery("caption", "!=", sectionCaption);
+		});
+
+		grSysUiSection.addQuery('title', false);
+		grSysUiSection.query();
+		while(grSysUiSection.next()){
+			sections.push(grSysUiSection.getValue('caption'));
+		}
+
+		if(this.getParameter('sysparm_view') || this.getParameter('sysparm_table') || this.getParameter('sysparm_sections'))
+			return JSON.stringify(sections);
+		else
+			return sections;
+	},
+
+	getFieldsSectionsTitle: function(viewName, tableName){
+		viewName = viewName || this.getParameter('sysparm_view') || "";
+		tableName = tableName || this.getParameter('sysparm_table') || '';
+
+		var grSUFS = new GlideRecord('sys_ui_form_section');
+
+		grSUFS.addQuery("position", 0);
+		grSUFS.addQuery("sys_ui_form.name", tableName);
+		grSUFS.addQuery("sys_ui_section.view.name", viewName);
+
+		grSUFS.query();
+		grSUFS.next();
+
+
+		var fields= [];
+
+		var grElement = new GlideRecord("sys_ui_element");
+		grElement.addQuery('sys_ui_section', grSUFS.sys_ui_section.sys_id);
+		grElement.addNullQuery("type");
+		grElement.orderBy("position");
+		grElement.query();
+
+		while(grElement.next())
+		{
+			fields.push(grElement.element.toString());
+		}
+
+		return fields.join(',');
+	},
+
+	getFieldsSections: function(viewName, tableName, sectionName, s){
+		gs.log("in s", "123test")
+		s = s || false;
+		if(!s){
+			viewName = viewName || this.getParameter('sysparm_view') || "";
+			tableName = tableName || this.getParameter('sysparm_table') || '';
+			sectionName = sectionName || this.getParameter('sysparm_section') || '';
+		}else{
+			gs.log([viewName, tableName, sectionName].join(','), "123test3")
+		}
+
+
+		var fields= [];
+
+		var grElement = new GlideRecord("sys_ui_element");
+		grElement.addQuery("sys_ui_section.caption", "IN", sectionName);
+		grElement.addQuery('sys_ui_section.name', tableName);
+		grElement.addQuery('sys_ui_section.view.name', viewName);
+		grElement.addQuery('sys_ui_section.title', false);
+		grElement.addNullQuery("type");
+		grElement.orderBy("position");
+		grElement.query();
+
+		while(grElement.next())
+		{
+			fields.push(grElement.element.toString());
+		}
+		gs.log(fields.join(','), "123test")
+
+		return fields.join(',');
+	},
+	getFormSections: function(action_on, actions, table, view){
+		action_on = action_on || JSON.parse(this.getParameter('sysparm_action_on') || '""');
+		actions = actions || JSON.parse(this.getParameter('sysparm_actions') || '[]');
+		table = table || this.getParameter('sysparm_table');
+		view = view || this.getParameter('sysparm_view');
+
+		var sections = [];
+		var grSysUiSection = new GlideRecord('sys_ui_section');
+		grSysUiSection.addEncodedQuery("view=" + (view || "Default view") + "^name=" + table);
+		grSysUiSection.addQuery('title', false);
+		grSysUiSection.query();
+		while(grSysUiSection.next()){
+			sections.push(grSysUiSection.getValue('caption'));
+		}
+
+		var all = sections;
+		var visible = this.getVisibleSections(action_on, actions, table).split(',');
+		var hidden = [];
+
+		all.forEach(function(section){
+			if(visible.indexOf(section) == -1)
+				hidden.push(section);
+		});
+
+		var rtn = {"all" : all.join(','), "visible": visible.join(','), "hidden" : hidden.join(',')};
+
+		return JSON.stringify(rtn);
+	},	
+	getVisibleSections: function(action_on , actions, table){
+
+		var user_id = gs.getUserID();
+		action_on = action_on || JSON.parse(this.getParameter('sysparm_action_on') || '""');
+		actions = actions || JSON.parse(this.getParameter('sysparm_actions') || '[]');
+		table = table || this.getParameter('sysparm_table');
+
+		var table_rec = new GlideRecord('sys_db_object');
+		table_rec.addQuery('name', table);
+		table_rec.query();
+
+		table_rec.next();	
+		var table_id = table_rec.getValue('sys_id');
+
+		var sections = [];
+		var ui_section_names = [];
+		var custom_cmdb_rights_and_actions = new GlideRecord('u_custom_cmdb_rights_and_actions');
+		custom_cmdb_rights_and_actions.addEncodedQuery('u_usersLIKE' + user_id + '^ORu_usersISEMPTY');
+		custom_cmdb_rights_and_actions.addQuery('u_action', action_on);
+		custom_cmdb_rights_and_actions.addEncodedQuery('u_tablesLIKE' + table_id);
+		custom_cmdb_rights_and_actions.query();
+
+		actions.forEach(function(action){
+			custom_cmdb_rights_and_actions.addQuery('u_' + action, 1);
+		});
+
+		while(custom_cmdb_rights_and_actions.next()){
+			sections.push(custom_cmdb_rights_and_actions.getValue('u_sections'));
+		}
+
+		var ui_section = new GlideRecord('sys_ui_section');
+		ui_section.addQuery('sys_id', 'IN', sections);
+		ui_section.query();
+
+		while(ui_section.next()){
+			ui_section_names.push(ui_section.getValue('caption') || '');
+		}
+
+		return ui_section_names.join(',');
+
+	},	
+	generateAllowedTable: function(action_on, actions, additional_query){
+
+		var q1 = this.getAllowedTableForUser(action_on, actions);
+		var qt = (q1 ? "nameIN" + q1 + "^" : "") + additional_query;
+
+		return qt;
+
+	},
+
+	getAllowedTableForUser: function(action_on, actions){	
+		var user_id = gs.getUserID();
+
+		var tables = [];
+
+		var custom_cmdb_rights_and_actions = new GlideRecord('u_custom_cmdb_rights_and_actions');
+		var query = 'u_usersLIKE' + user_id;
+
+		var user_group = gs.getUser().getMyGroups().toArray();
+		var user_group_id = [];
+
+		var gr = new GlideRecord('sys_user_group');
+		gr.addQuery('name', 'IN', user_group.join(','));
+		gr.query();
+
+		while(gr.next()){
+			user_group_id.push(gr.sys_id);
+		}
+
+		query += "^NQu_ci_groupsLIKE" + 
+			custom_cmdb_rights_and_actions.addEncodedQuery();
+		custom_cmdb_rights_and_actions.addQuery('u_action', action_on);
+
+		actions.forEach(function(action){
+			custom_cmdb_rights_and_actions.addQuery('u_' + action, 1);
+		});
+		custom_cmdb_rights_and_actions.query();
+
+		while(custom_cmdb_rights_and_actions.next()){
+			tables.push(custom_cmdb_rights_and_actions.getValue('u_tables'));
+		}
+
+		return this.getTableFromSysId(tables.join(','));
+
+	},
+
+	getTableFromSysId: function(ids){
+		var tables_names = [];
+
+		var tables = new GlideRecord('sys_db_object');
+		tables.addQuery('sys_id', 'IN', ids);
+		tables.query();
+
+		while(tables.next()){
+			tables_names.push(tables.getValue('name'));
+		}
+
+		return tables_names.join(',');
+	},
+
+	getBusinessAppROSections: function(businessAppId){
+		businessAppId = businessAppId || this.getParameter('sysparm_businessAppId') || '';
+		var grBsApp = new GlideRecord('cmdb_ci_business_app');
+
+		if(grBsApp.get(businessAppId)){
+
+			var isMemberOfSupportGroupParent = gs.getUser().isMemberOf(grBsApp.support_group.u_governance_group);
+			var isCmdbAdmin = gs.getUser().hasRole('ecmdb_admin');
+			var isRiskGovMember = gs.getUser().isMemberOf(this.RISKGOV);
+			var isContinuityGovMember = gs.getUser().isMemberOf(this.CONTINUITYGOV);
+			var isImGovMember = gs.getUser().isMemberOf(this.IAMGOV);
+			var isBRM = gs.getUserID() == grBsApp.department.business_unit.u_brm;
+			var isOnboardingSupMember = gs.getUser().isMemberOf(this.ONBOARDINGSUPPORT);
+
+			var sectionCondition = [
+				{ name: "root", condition: isCmdbAdmin},
+				{ name: "Configuration Information", condition: isMemberOfSupportGroupParent || isOnboardingSupMember },
+				{ name: "Owner Information", condition: isBRM },
+				{ name: "Business Relationship Information", condition: isBRM },
+				{ name: "Contact Information", condition: isMemberOfSupportGroupParent},
+				{ name: "Software Licensing", condition: isMemberOfSupportGroupParent},
+				{ name: "Risk Management", condition: isRiskGovMember},
+				{ name: "Business Continuity", condition: isContinuityGovMember},
+				{ name: "Authentication Information", condition: isImGovMember},
+				{ name: "Password Control", condition: isImGovMember},
+				{ name: "AI (Artificial Intelligence)", condition: isImGovMember },
+				{ name: "Business Value", condition: isImGovMember },
+				{ name: "Application Certification", condition: isCmdbAdmin},
+			];
+
+			var fields = [];
+
+			var that = this;
+
+			sectionCondition.forEach(function(element){
+				var sec_fields;
+				if(!element.condition){
+					if(element.name == "root"){
+						sec_fields = that.getFieldsSectionsTitle("", "cmdb_ci_business_app");
+					}else{
+						sec_fields = that.getFieldsSections("", "cmdb_ci_business_app", element.name);
+					}
+					if(sec_fields)
+						fields = fields.concat(sec_fields.split(','));
+				}
+			});
+
+			return fields.join(',');
+		}
+	},
+
+	saveVartoRequest: function(json_obj, table, sys_id, parent_field){
+		sys_id = sys_id || this.getParameter('sysparm_sys_id') || '';
+		table = table || this.getParameter('sysparm_table') || '';
+		parent_field = parent_field || this.getParameter('sysparm_parent_field') || '';
+		json_obj = JSON.parse(json_obj || this.getParameter('sysparm_json_obj') || "[]");
+
+		if(sys_id && table && json_obj){
+			var gr = new GlideRecord(table);
+			if (gr.get(sys_id)) {
+				json_obj.forEach(function(field){
+					if(field.field.indexOf('variables') == 0){
+						var f_name = field.field.split('.')[1];
+						gr.variables[f_name] = field.value;
+					}else{
+						gr.setValue(field.field, field.value);
+					}
+				});
+				gr.update();
+			}
+			if(parent_field){
+				var parent = gr[parent_field].getRefRecord();
+
+				json_obj.forEach(function(field){
+					if(field.field.indexOf('variables') == 0){
+						var f_name = field.field.split('.')[1];
+						parent.variables[f_name] = field.value;
+					}else{
+						//parent.setValue(field.field, field.value);
+					}
+				});
+				parent.update();
+			}
+		}
+	},
+
+	type: 'hgcCiItemsUtils'
+});
