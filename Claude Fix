@@ -50,18 +50,25 @@ saveAssessementToBusinessApps: function(current, save, appID) {
         return false;
     }
 
-    function toInt(value) {
+    // Convert to string to ensure proper choice value storage
+    function toString(value) {
         if (value === "" || value === null || value === undefined) {
-            return 0;
+            return "0";
         }
+        // Remove any decimal points and convert to string
         var num = parseInt(value, 10);
-        return isNaN(num) ? 0 : num;
+        if (isNaN(num)) {
+            return "0";
+        }
+        return num.toString();
     }
 
+    // Compare as integers, return as string
     function maxValue(current, newVal) {
-        var currentInt = toInt(current);
-        var newInt = toInt(newVal);
-        return (currentInt > newInt) ? currentInt : newInt;
+        var currentInt = parseInt(current, 10) || 0;
+        var newInt = parseInt(newVal, 10) || 0;
+        var maxInt = (currentInt > newInt) ? currentInt : newInt;
+        return maxInt.toString();
     }
 
     // ===== GET ALL BUSINESS APPS FOR THIS ASSESSMENT =====
@@ -86,12 +93,13 @@ saveAssessementToBusinessApps: function(current, save, appID) {
         gs.info("ACDC: Processing Business App: " + businessApp);
         gs.info("ACDC: ========================================");
         
+        // Initialize as STRINGS (choice field values)
         var fieldValues = {
-            u_glba: 0,
-            u_sensitive: 0,
-            u_sensitive_commercial: 0,
-            u_pci: 0,
-            u_hipaa_hitech: 0
+            u_glba: "0",
+            u_sensitive: "0",
+            u_sensitive_commercial: "0",
+            u_pci: "0",
+            u_hipaa_hitech: "0"
         };
 
         // ========================================
@@ -111,7 +119,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
             gs.info("ACDC: [GLBA Consumer] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
             
             if (hasRequiredValue && hasTwoValues) {
-                var glbaHowMany = toInt(getMetricValue(instance, businessApp, "glba_how_many"));
+                var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
                 gs.info("ACDC: [GLBA Consumer] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
                 fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
                 fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, glbaHowMany);
@@ -129,7 +137,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
             gs.info("ACDC: [GLBA Commercial] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
             
             if (hasRequiredValue && hasTwoValues) {
-                var glbaHowMany = toInt(getMetricValue(instance, businessApp, "glba_how_many"));
+                var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
                 gs.info("ACDC: [GLBA Commercial] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
                 fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
                 fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
@@ -147,7 +155,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
             gs.info("ACDC: [GLBA Both] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
             
             if (hasRequiredValue && hasTwoValues) {
-                var glbaHowMany = toInt(getMetricValue(instance, businessApp, "glba_how_many"));
+                var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
                 gs.info("ACDC: [GLBA Both] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
                 fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
                 fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, glbaHowMany);
@@ -178,7 +186,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
             gs.info("ACDC: [PCI] Has 2+ selections? " + hasTwoValues);
             
             if (hasTwoValues) {
-                var pciHowMany = toInt(getMetricValue(instance, businessApp, "pci_how_many"));
+                var pciHowMany = toString(getMetricValue(instance, businessApp, "pci_how_many"));
                 gs.info("ACDC: [PCI] ✓ Requirements MET. Setting values from pci_how_many = " + pciHowMany);
                 fieldValues.u_glba = maxValue(fieldValues.u_glba, pciHowMany);
                 fieldValues.u_pci = maxValue(fieldValues.u_pci, pciHowMany);
@@ -205,7 +213,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
             gs.info("ACDC: [HIPAA] Has 2+ selections? " + hasTwoValues);
             
             if (hasTwoValues) {
-                var hipaaHowMany = toInt(getMetricValue(instance, businessApp, "hipaa_how_many"));
+                var hipaaHowMany = toString(getMetricValue(instance, businessApp, "hipaa_how_many"));
                 gs.info("ACDC: [HIPAA] ✓ Requirements MET. Setting value from hipaa_how_many = " + hipaaHowMany);
                 fieldValues.u_hipaa_hitech = maxValue(fieldValues.u_hipaa_hitech, hipaaHowMany);
             } else {
@@ -231,7 +239,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
             gs.info("ACDC: [Employee Info] Has 2+ selections? " + hasTwoValues);
             
             if (hasTwoValues) {
-                var sensitiveHowMany = toInt(getMetricValue(instance, businessApp, "sensitive2_how_many"));
+                var sensitiveHowMany = toString(getMetricValue(instance, businessApp, "sensitive2_how_many"));
                 gs.info("ACDC: [Employee Info] ✓ Requirements MET. Setting value from sensitive2_how_many = " + sensitiveHowMany);
                 fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, sensitiveHowMany);
             } else {
@@ -247,14 +255,14 @@ saveAssessementToBusinessApps: function(current, save, appID) {
         
         gs.info("ACDC: ----------------------------------------");
         gs.info("ACDC: FINAL VALUES for Business App " + businessApp + ":");
-        gs.info("ACDC:   u_glba = " + fieldValues.u_glba);
-        gs.info("ACDC:   u_sensitive = " + fieldValues.u_sensitive);
-        gs.info("ACDC:   u_sensitive_commercial = " + fieldValues.u_sensitive_commercial);
-        gs.info("ACDC:   u_pci = " + fieldValues.u_pci);
-        gs.info("ACDC:   u_hipaa_hitech = " + fieldValues.u_hipaa_hitech);
+        gs.info("ACDC:   u_glba = '" + fieldValues.u_glba + "' (type: " + typeof fieldValues.u_glba + ")");
+        gs.info("ACDC:   u_sensitive = '" + fieldValues.u_sensitive + "' (type: " + typeof fieldValues.u_sensitive + ")");
+        gs.info("ACDC:   u_sensitive_commercial = '" + fieldValues.u_sensitive_commercial + "' (type: " + typeof fieldValues.u_sensitive_commercial + ")");
+        gs.info("ACDC:   u_pci = '" + fieldValues.u_pci + "' (type: " + typeof fieldValues.u_pci + ")");
+        gs.info("ACDC:   u_hipaa_hitech = '" + fieldValues.u_hipaa_hitech + "' (type: " + typeof fieldValues.u_hipaa_hitech + ")");
         gs.info("ACDC: ----------------------------------------");
         
-        // Store answers for return value (used by BR for lookup)
+        // Store answers for return value (used by BR for lookup) - keep as strings
         answers[businessApp] = {
             u_glba: fieldValues.u_glba,
             u_sensitive: fieldValues.u_sensitive,
@@ -270,13 +278,13 @@ saveAssessementToBusinessApps: function(current, save, appID) {
                 gs.info("ACDC: Successfully loaded business app record for UPDATE");
                 
                 // Log current values
-                gs.info("ACDC: BEFORE UPDATE - u_glba: " + app.getValue('u_glba') + 
-                       ", u_sensitive: " + app.getValue('u_sensitive') +
-                       ", u_pci: " + app.getValue('u_pci') +
-                       ", u_hipaa_hitech: " + app.getValue('u_hipaa_hitech') +
-                       ", u_critical_application_risk: " + app.getValue('u_critical_application_risk'));
+                gs.info("ACDC: BEFORE UPDATE - u_glba: '" + app.getValue('u_glba') + "'" +
+                       ", u_sensitive: '" + app.getValue('u_sensitive') + "'" +
+                       ", u_pci: '" + app.getValue('u_pci') + "'" +
+                       ", u_hipaa_hitech: '" + app.getValue('u_hipaa_hitech') + "'" +
+                       ", u_critical_application_risk: '" + app.getValue('u_critical_application_risk') + "'");
                 
-                // Set field values as INTEGERS (not floats!)
+                // Set field values as STRINGS (choice field values)
                 app.setValue('u_glba', fieldValues.u_glba);
                 app.setValue('u_sensitive', fieldValues.u_sensitive);
                 app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
@@ -292,10 +300,11 @@ saveAssessementToBusinessApps: function(current, save, appID) {
                 var verify = new GlideRecord('cmdb_ci_business_app');
                 if (verify.get(businessApp)) {
                     gs.info("ACDC: VERIFICATION - After update:");
-                    gs.info("ACDC:   u_glba = " + verify.getValue('u_glba') + " (type: " + typeof verify.getValue('u_glba') + ")");
-                    gs.info("ACDC:   u_sensitive = " + verify.getValue('u_sensitive'));
-                    gs.info("ACDC:   u_pci = " + verify.getValue('u_pci'));
-                    gs.info("ACDC:   u_hipaa_hitech = " + verify.getValue('u_hipaa_hitech'));
+                    gs.info("ACDC:   u_glba = '" + verify.getValue('u_glba') + "' (type: " + typeof verify.getValue('u_glba') + ")");
+                    gs.info("ACDC:   u_sensitive = '" + verify.getValue('u_sensitive') + "'");
+                    gs.info("ACDC:   u_pci = '" + verify.getValue('u_pci') + "'");
+                    gs.info("ACDC:   u_hipaa_hitech = '" + verify.getValue('u_hipaa_hitech') + "'");
+                    gs.info("ACDC:   u_sensitive_commercial = '" + verify.getValue('u_sensitive_commercial') + "'");
                     gs.info("ACDC:   u_critical_application_risk = '" + verify.getValue('u_critical_application_risk') + "'");
                 }
             } else {
