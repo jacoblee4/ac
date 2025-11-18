@@ -33,7 +33,7 @@ saveAssessementToBusinessApps: function(current, save, appID) {
         while (gr.next()) {
             var value = gr.getValue("value");
             if (value && value != "0" && value != "") {
-                values.push(parseInt(value));
+                values.push(parseInt(value, 10));
             }
         }
         
@@ -51,7 +51,10 @@ saveAssessementToBusinessApps: function(current, save, appID) {
     }
 
     function toInt(value) {
-        var num = parseInt(value);
+        if (value === "" || value === null || value === undefined) {
+            return 0;
+        }
+        var num = parseInt(value, 10);
         return isNaN(num) ? 0 : num;
     }
 
@@ -251,44 +254,56 @@ saveAssessementToBusinessApps: function(current, save, appID) {
         gs.info("ACDC:   u_hipaa_hitech = " + fieldValues.u_hipaa_hitech);
         gs.info("ACDC: ----------------------------------------");
         
-        // Changed from cmdb_ci_business_app to cmdb_ci
-        var app = new GlideRecord('cmdb_ci');
-        if (app.get(businessApp)) {
-            gs.info("ACDC: Successfully loaded business app record");
-            
-            // Log current values before update
-            gs.info("ACDC: BEFORE UPDATE - u_glba: " + app.getValue('u_glba') + 
-                   ", u_sensitive: " + app.getValue('u_sensitive') +
-                   ", u_pci: " + app.getValue('u_pci') +
-                   ", u_hipaa_hitech: " + app.getValue('u_hipaa_hitech'));
-            
-            // Set all field values (including zeros to overwrite existing data)
-            Object.keys(fieldValues).forEach(function(field) {
-                app.setValue(field, fieldValues[field]);
-            });
-            
-            // Store answers for return value
-            answers[businessApp] = fieldValues;
-            
-            // Actually update the record if save conditions are met
-            if ((save && !appID) || (save && appID && businessApp == appID)) {
+        // Store answers for return value (used by BR for lookup)
+        answers[businessApp] = {
+            u_glba: fieldValues.u_glba,
+            u_sensitive: fieldValues.u_sensitive,
+            u_sensitive_commercial: fieldValues.u_sensitive_commercial,
+            u_pci: fieldValues.u_pci,
+            u_hipaa_hitech: fieldValues.u_hipaa_hitech
+        };
+        
+        // Only update if save=true (after RBAC approval or if no risk change)
+        if ((save && !appID) || (save && appID && businessApp == appID)) {
+            var app = new GlideRecord('cmdb_ci_business_app');
+            if (app.get(businessApp)) {
+                gs.info("ACDC: Successfully loaded business app record for UPDATE");
+                
+                // Log current values
+                gs.info("ACDC: BEFORE UPDATE - u_glba: " + app.getValue('u_glba') + 
+                       ", u_sensitive: " + app.getValue('u_sensitive') +
+                       ", u_pci: " + app.getValue('u_pci') +
+                       ", u_hipaa_hitech: " + app.getValue('u_hipaa_hitech') +
+                       ", u_critical_application_risk: " + app.getValue('u_critical_application_risk'));
+                
+                // Set field values as INTEGERS (not floats!)
+                app.setValue('u_glba', fieldValues.u_glba);
+                app.setValue('u_sensitive', fieldValues.u_sensitive);
+                app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+                app.setValue('u_pci', fieldValues.u_pci);
+                app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+                
+                // DO NOT set u_critical_application_risk here - the BR handles that via lookup table
+                
                 app.update();
                 gs.info("ACDC: ✓ Business app record UPDATED in database");
                 
-                // Verify the update worked
-                var verify = new GlideRecord('cmdb_ci');
+                // Verify the update
+                var verify = new GlideRecord('cmdb_ci_business_app');
                 if (verify.get(businessApp)) {
-                    gs.info("ACDC: VERIFICATION - After update: u_glba=" + verify.getValue('u_glba') + 
-                           ", u_sensitive=" + verify.getValue('u_sensitive') +
-                           ", u_pci=" + verify.getValue('u_pci') +
-                           ", u_hipaa_hitech=" + verify.getValue('u_hipaa_hitech'));
+                    gs.info("ACDC: VERIFICATION - After update:");
+                    gs.info("ACDC:   u_glba = " + verify.getValue('u_glba') + " (type: " + typeof verify.getValue('u_glba') + ")");
+                    gs.info("ACDC:   u_sensitive = " + verify.getValue('u_sensitive'));
+                    gs.info("ACDC:   u_pci = " + verify.getValue('u_pci'));
+                    gs.info("ACDC:   u_hipaa_hitech = " + verify.getValue('u_hipaa_hitech'));
+                    gs.info("ACDC:   u_critical_application_risk = '" + verify.getValue('u_critical_application_risk') + "'");
                 }
             } else {
-                gs.info("ACDC: ○ Business app record NOT saved (preview mode or different appID)");
-                gs.info("ACDC:   Reason: save=" + save + ", appID=" + appID + ", current businessApp=" + businessApp);
+                gs.error("ACDC: ✗ ERROR: Could not load business app record: " + businessApp);
             }
         } else {
-            gs.error("ACDC: ✗ ERROR: Could not load business app record: " + businessApp);
+            gs.info("ACDC: ○ Business app record NOT saved (preview mode or different appID)");
+            gs.info("ACDC:   Reason: save=" + save + ", appID=" + appID + ", current businessApp=" + businessApp);
         }
     });
 
