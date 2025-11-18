@@ -1,0 +1,45 @@
+I'm presenting you 2 code snips.
+
+The "Old Code" Is the code that was working before.
+
+The "New code" is the code from old code that I am trying to update.
+
+Basically I don't fully understand the old code but there is an assessment that has a few questions. Once the assessment is completed and it's supposed to update a few fields on the business application it was triggered from. 
+Critical Application (Risk) | u_critical_application_risk (options No | Yes | YesRBAC)
+NPI\GLBA | u_glba (options 0 | 1 | 101 | 1001)
+PCI | u_pci (options 0 | 1 | 101 | 1001)
+Sensitive | u_sensitive (options 0 | 1 | 101 | 1001)
+HIPAA\HITECH | u_hipaa_hitech (options 0 | 1 | 101 | 1001)
+
+these are the fields it updates. I also think there is a process inbetween where if it's detected as a risk it triggers a task to a team and only after they confirm does it update these fields. 
+
+My understanding is that is was pretty simple I believe before where there was a questions regarding GLBA and then it would update the GLBA based on the answers.
+
+The assessment has changed and has a few new fields. Basically the logic should be like this:
+
+
+Question section 1:
+GLBA section
+Initial question: glba_data_type
+options (Consumer | 1, Commercial | 2, Both | 3, None | 4)
+If Consumer (1) is chosen it shows them a multi select called glba_data_type_selected_consumer appears with options that have values 1-7. 
+It requires at least 1 value that is 1,2, or 3. Then it also requires at least 1 additional value. So basically it requires 2 values total but one of them must be 1,2, or 3. if this is not true than it does not update anything on the business applcaiton. If this is true, it will pull the value from glba_how_many (1, 101, or 1001) and populate both u_glba and u_sensitive with this value (but there is a catch and I will mention that later, basically it will populate glba and sesneative only if it's the largest value).
+
+Then if glba_data_type was option 2 (commercial) It's pretty similar to the above except there are values in the field glba_data_type_selected_commercial 1-9 but still depends on a value 1-3 + another value to = GLB and Sensitive. The only catch here is that for commercial we added a new Sensitive field Sensitive Commercial | u_sensitive_commercial. This one will update GLB and Sensitive Commercial. 
+
+Then there is the glba_data_type of Both (3). This one has values in the field glba_data_type_selected_both 1-13 but still depends on 1 from 1-3 and any additional value. The catch with this one is if it gets the 2 required values it will update both u_sensitive and u_sensitive_commercial.
+
+So to make this future proof can it be set up that it basically looks for a value 1-3 + any additional value in case for example they add values to both or commercial it will look for higher numbers than what we have today?
+
+
+Then the next section is for PCI data
+This has the field pci_data which has a boolean Yes/No data type. If it's no nothing happens. If it's yes this field with another multi select pops up pci_other with values 1-5. If it gets ANY 2 (also make this future proof in case they add for example values 6-10 or whatever). But if it gets ANY 2 than it sets both u_glba and u_pci with the value in pci_how_many (Again 1, 101, 1001). The catch is that for u_glba it uses the highest value. So if the section above had a 101 in it's field glba_how_many and this pci field was only a 1 it will stick with the 101, but if the pci was 1001 it will use the 1001. So basicallyt we are looking for the highest glba.
+
+The next section is for hipaa and stants with another bloonea yes/no called hipaa_hitech_data. for a no we do nothing, for a yes we look at the multi select hipaa_yes which just has values 1-3 (also should be future proof). THis one also just requires ANY 2 values and will set u_hipaa_hitech on the business app with those (1,101,1001) from hipaa_how_many. 
+
+Finally we have employee info. This starts with another boolean sensitive2_employee_info for a yes we open the multi select sensitive2_yes with values 1-6. This should also be future proof. It requires also ANY 2 of these to be checked. If it has 2 or more it sets the business app field u_sensitive from the value in sensitive2_how_many (1,101,1001). This one is also treated the same where if the above field that is setting u_sensitive is higher it uses the highest value. It should always use the highest value found across all answers for all of the business app fields.
+
+
+
+
+This is a very important process, please confirm if there is any missing information I can try to provide. The script I sent you for "new code" was a work in progress so feel free to compeltely redo it and if you have any clarifiying questions or need additonal code to understand the process ploease ask.
