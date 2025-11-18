@@ -1,0 +1,200 @@
+var HGC_ACDC_Utils = Class.create();
+HGC_ACDC_Utils.prototype = {
+
+	initialize: function() {
+
+	},
+
+	generateRBACRequest: function(appID, assessmentID, newRiskValue){
+
+		var grCCBA = new GlideRecord('cmdb_ci_business_app');
+		if (grCCBA.get(appID)) {
+
+			/*var ritm = new GlideRecord("sc_req_item");
+			ritm.addActiveQuery();
+			ritm.addQuery('cmdb_ci', grCCBA.sys_id);  
+			//ritm.addEncodedQuery('cat_item=4862631edb509550b37a622dca96197f');
+			ritm.query();*/
+
+			//^ORcat_item=8dafbd3edbf82b0032049447db96199c^ORcat_item=627927ffdb7a7fc0d51c9ac5db9619da
+
+
+
+			var cartId = GlideGuid.generate(null);
+			var cart = new Cart(cartId); //calling the cart API
+			var item = cart.addItem('4862631edb509550b37a622dca96197f'); //RBAC Manage ACDC Survey
+			cart.setVariable(item, 'requested_for', grCCBA.owned_by);
+			cart.setVariable(item, 'opened_by', grCCBA.owned_by);
+			cart.setVariable(item, 'critical_application', newRiskValue);
+			cart.setVariable(item, 'assessment_record', assessmentID);
+			cart.setVariable(item, 'business_application', grCCBA.sys_id);
+			var rc = cart.placeOrder();
+
+			var req = new GlideRecord('sc_req_item');
+			req.addQuery('request', rc.sys_id);
+			req.query();
+			while (req.next()) {
+				req.cmdb_ci = grCCBA.sys_id;
+				req.description = req.comments = "Created because the 'Critical Application (Risk)' is changing from " + grCCBA.u_critical_application_risk.getDisplayValue() + " to " + newRiskValue;
+				req.comments = "Created because the 'Critical Application (Risk)' is changing from " + grCCBA.u_critical_application_risk.getDisplayValue() + " to " + newRiskValue;
+				req.update();
+			}
+			gs.addInfoMessage("RBAC Manage ACDC Survey Request was created");
+		}
+
+	},
+
+	saveAssessementToBusinessApps: function(current, save, appID){
+
+		var answers = {};
+
+		var instance = current.getUniqueValue();
+
+		function getMetricAnswer(instance, businessApp, queries) {
+			for (var index = 0; index < queries.length; index++) {
+				var grAAIQ = new GlideRecord('asmt_assessment_instance_question');
+				var baseQuery = "source_id=" + businessApp + "^instance=" + instance;
+
+				var totalrecords = 0; 
+				var queryBuilding = [];
+
+				Object.keys(queries[index]).forEach(function (el) {
+					totalrecords += queries[index][el].length;
+					queries[index][el].forEach(function (val) {
+						queryBuilding.push("metric.name=" + el + "^value=" + val);
+					});
+				});
+
+				grAAIQ.addEncodedQuery(baseQuery + "^" + queryBuilding.join("^NQ" + baseQuery + "^"));
+				grAAIQ.query();
+				if (grAAIQ.getRowCount() == totalrecords)
+					return grAAIQ.getRowCount() == totalrecords;
+			}
+			return false;
+		}
+
+		function getMetricValue(instance, businessApp, field){
+			var grAAIQ = new GlideRecord('asmt_assessment_instance_question');
+			grAAIQ.addQuery("source_id", businessApp);
+			grAAIQ.addQuery("instance", instance);
+			grAAIQ.addQuery("metric.name", field);
+			grAAIQ.query();
+			if(grAAIQ.next()){
+				return grAAIQ.getValue("value");
+			}
+			return "";
+		}
+
+		//Reconfifured as per INC0227291
+		//glba_other [1] -> Customer Address
+		//glba_other [2] -> Customer Telephone/Fax Number
+		//glba_other [3] -> Customer Account Number
+		//glba_other [4] -> Customer Social Security Number
+		//glba_other [5] -> Customer Driver's License
+		//glba_other [6] -> Customer Passport or Alien Registration Number
+		//glba_other [7] -> Cardholder Name
+		//glba_other [8] -> Debit/Credit Card Number
+		//glba_other [9] -> Pin or password
+		
+		var isGLBA_NPI_Senarios = [
+			{ "glba_customer_name": [1], "glba_other": [3] },
+			{ "glba_customer_name": [1], "glba_other": [4] },
+			{ "glba_customer_name": [1], "glba_other": [5] },
+			{ "glba_customer_name": [1], "glba_other": [6] },
+			{ "glba_customer_name": [1], "glba_other": [8] },
+			{ "glba_customer_name": [1], "glba_other": [9] },
+		];
+
+
+		// pci_other [1] Debit/Credit Card Number
+		// pci_other [2] Debit Card PIN
+		// pci_other [3] Credit Card Expiry Date
+		// pci_other [4] Credit Card CVV Code
+
+		var isPCI_Senarios = [
+			{ "pci_cardholder_name": [1], "pci_other": [1] },
+		];
+
+		// hipaa_other [1] The individual's past, present or future...
+		// hipaa_other [2] The provision of health care to the indi...
+		// hipaa_other [3] The past, present, or future payment for...
+
+		var isHIPAA_HITECH_Senarios = [
+			{ "hipaa_medical_beneficiary_name": [1], "hipaa_other": [1] },
+			{ "hipaa_medical_beneficiary_name": [1], "hipaa_other": [2] },
+			{ "hipaa_medical_beneficiary_name": [1], "hipaa_other": [3] },
+		];
+
+		var isSENSITIVE_DATA1_Senarios = [
+			{ "sensitive1_private_client_name": [1], "sensitive1_other": [1] },
+			{ "sensitive1_private_client_name": [1], "sensitive1_other": [2] },
+			{ "sensitive1_private_client_name": [1], "sensitive1_other": [3] },
+			{ "sensitive1_private_client_name": [1], "sensitive1_other": [4] },
+			{ "sensitive1_private_client_name": [1], "sensitive1_other": [5] },
+		];
+
+		var isSENSITIVE_DATA2_Senarios = [
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [1] },
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [2] },
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [3] },
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [4] },
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [5] },
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [6] },
+			{ "sensitive2_employee_name": [1], "sensitive2_other": [7] },
+		];
+
+		var senarios = [
+			{ "senario": isGLBA_NPI_Senarios, "ciField": "u_glba", "asField": "glba_how_many" },
+			{ "senario": isPCI_Senarios, "ciField": "u_pci", "asField": "pci_how_many" },
+			{ "senario": isHIPAA_HITECH_Senarios, "ciField": "u_hipaa_hitech", "asField": "hipaa_how_many" },
+			{ "senario": isSENSITIVE_DATA1_Senarios, "ciField": "u_sensitive", "asField": "sensitive1_how_many" },
+			{ "senario": isSENSITIVE_DATA2_Senarios, "ciField": "u_sensitive", "asField": "sensitive2_how_many" },
+		];
+
+		var fieldValues = {};
+
+		var businessApps = [];
+
+		var agg = new GlideAggregate('asmt_assessment_instance_question');
+		agg.addAggregate('COUNT', 'source_id');
+		agg.addQuery("instance", instance);
+		agg.orderBy('source_id');
+		agg.query();
+		while (agg.next()) {
+			var businessApp = agg.getValue('source_id');
+			businessApps.push(businessApp);
+		}
+
+		businessApps.forEach(function (businessApp) {
+			senarios.forEach(function (senarioDefinition) {
+
+				if(getMetricAnswer(instance, businessApp, senarioDefinition.senario)){
+					var fieldValue = getMetricValue(instance, businessApp, senarioDefinition.asField);
+
+					fieldValues[senarioDefinition.ciField] = fieldValues[senarioDefinition.ciField] || fieldValue;
+					if(fieldValues[senarioDefinition.ciField] < fieldValue){
+						fieldValues[senarioDefinition.ciField] = fieldValue;
+					}
+				}else{
+					if(!fieldValues[senarioDefinition.ciField]){
+						fieldValues[senarioDefinition.ciField] = 0;
+					}
+				}
+			});		
+
+			Object.keys(fieldValues).forEach(function(ciField){
+				var app = new GlideRecordUtil().getGR("cmdb_ci", businessApp);
+				app.setValue(ciField, fieldValues[ciField]);
+				answers[businessApp] = answers[businessApp] || {};
+				answers[businessApp][ciField] = fieldValues[ciField];
+				if((save && !appID) || (save && appID && businessApp == appID))
+					app.update();
+			});
+		});
+	
+
+		return answers;
+	},
+
+	type: 'HGC_ACDC_Utils'
+};
