@@ -17,7 +17,7 @@
 
             var values = Object.keys(answers[app]);
             values.forEach(function (key) {
-                if(key != "u_hipaa_hitech")
+                if(key != "u_hipaa_hitech" && key != "u_sensitive_commercial")
                 query += "^" + key + "=" + answers[app][key];
             });
 
