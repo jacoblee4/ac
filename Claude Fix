@@ -1,346 +1,380 @@
-saveAssessementToBusinessApps: function(current, save, appID) {
-    var answers = {};
-    var instance = current.getUniqueValue();
+var HGC_ACDC_Utils = Class.create();
+HGC_ACDC_Utils.prototype = {
 
-    gs.info("ACDC Assessment: Starting processing for instance: " + instance);
-    gs.info("ACDC Assessment: save=" + save + ", appID=" + appID);
+    initialize: function() {},
 
-    // ===== HELPER FUNCTIONS =====
-    
-    function getMetricValue(instance, businessApp, fieldName) {
-        var gr = new GlideRecord('asmt_assessment_instance_question');
-        gr.addQuery("source_id", businessApp);
-        gr.addQuery("instance", instance);
-        gr.addQuery("metric.name", fieldName);
-        gr.query();
-        if (gr.next()) {
-            var value = gr.getValue("value");
-            gs.info("ACDC: [" + fieldName + "] = '" + value + "'");
-            return value;
-        }
-        gs.info("ACDC: [" + fieldName + "] = (empty)");
-        return "";
-    }
+    generateRBACRequest: function(appID, assessmentID, newRiskValue) {
+        var grCCBA = new GlideRecord('cmdb_ci_business_app');
+        if (grCCBA.get(appID)) {
+            var cartId = GlideGuid.generate(null);
+            var cart = new Cart(cartId);
+            var item = cart.addItem('4862631edb509550b37a622dca96197f'); // RBAC Manage ACDC Survey
+            cart.setVariable(item, 'requested_for', grCCBA.owned_by);
+            cart.setVariable(item, 'opened_by', grCCBA.owned_by);
+            cart.setVariable(item, 'critical_application', newRiskValue);
+            cart.setVariable(item, 'assessment_record', assessmentID);
+            cart.setVariable(item, 'business_application', grCCBA.sys_id);
+            var rc = cart.placeOrder();
 
-    function getMultiSelectValues(instance, businessApp, fieldName) {
-        var values = [];
-        var gr = new GlideRecord('asmt_assessment_instance_question');
-        gr.addQuery("source_id", businessApp);
-        gr.addQuery("instance", instance);
-        gr.addQuery("metric.name", fieldName);
-        gr.query();
-        
-        while (gr.next()) {
-            var value = gr.getValue("value");
-            if (value && value != "0" && value != "") {
-                values.push(parseInt(value, 10));
+            var req = new GlideRecord('sc_req_item');
+            req.addQuery('request', rc.sys_id);
+            req.query();
+            while (req.next()) {
+                req.cmdb_ci = grCCBA.sys_id;
+                req.description = req.comments = "Created because the 'Critical Application (Risk)' is changing from " +
+                    grCCBA.u_critical_application_risk.getDisplayValue() + " to " + newRiskValue;
+                req.update();
             }
+            gs.addInfoMessage("RBAC Manage ACDC Survey Request was created");
         }
-        
-        gs.info("ACDC: Multi-select [" + fieldName + "] selected values: [" + values.join(", ") + "]");
-        return values;
-    }
+    },
 
-    function hasValueInRange(values, min, max) {
-        for (var i = 0; i < values.length; i++) {
-            if (values[i] >= min && values[i] <= max) {
-                return true;
+    saveAssessementToBusinessApps: function(current, save, appID) {
+        var answers = {};
+        var instance = current.getUniqueValue();
+
+        gs.info("ACDC Assessment: Starting processing for instance: " + instance);
+        gs.info("ACDC Assessment: save=" + save + ", appID=" + appID);
+
+        // ===== HELPER FUNCTIONS =====
+
+        function getMetricValue(instance, businessApp, fieldName) {
+            var gr = new GlideRecord('asmt_assessment_instance_question');
+            gr.addQuery("source_id", businessApp);
+            gr.addQuery("instance", instance);
+            gr.addQuery("metric.name", fieldName);
+            gr.query();
+            if (gr.next()) {
+                var value = gr.getValue("value");
+                gs.info("ACDC: [" + fieldName + "] = '" + value + "'");
+                return value;
             }
+            gs.info("ACDC: [" + fieldName + "] = (empty)");
+            return "";
         }
-        return false;
-    }
 
-    function toString(value) {
-        if (value === "" || value === null || value === undefined) {
-            return "0";
+        function getMultiSelectValues(instance, businessApp, fieldName) {
+            var values = [];
+            var gr = new GlideRecord('asmt_assessment_instance_question');
+            gr.addQuery("source_id", businessApp);
+            gr.addQuery("instance", instance);
+            gr.addQuery("metric.name", fieldName);
+            gr.query();
+
+            while (gr.next()) {
+                var value = gr.getValue("value");
+                if (value && value != "0" && value != "") {
+                    values.push(parseInt(value, 10));
+                }
+            }
+
+            gs.info("ACDC: Multi-select [" + fieldName + "] selected values: [" + values.join(", ") + "]");
+            return values;
         }
-        var num = parseInt(value, 10);
-        if (isNaN(num)) {
-            return "0";
+
+        function hasValueInRange(values, min, max) {
+            for (var i = 0; i < values.length; i++) {
+                if (values[i] >= min && values[i] <= max) {
+                    return true;
+                }
+            }
+            return false;
         }
-        return num.toString();
-    }
 
-    function maxValue(current, newVal) {
-        var currentInt = parseInt(current, 10) || 0;
-        var newInt = parseInt(newVal, 10) || 0;
-        var maxInt = (currentInt > newInt) ? currentInt : newInt;
-        return maxInt.toString();
-    }
-
-    // NEW FUNCTION: Determine critical risk from lookup table (same logic as BR)
-    function getCriticalRiskFromLookup(grCCBA, fieldValues) {
-        var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
-        query += "^u_sox=" + grCCBA.getValue("u_sox");
-        query += "^u_glba=" + fieldValues.u_glba;
-        query += "^u_sensitive=" + fieldValues.u_sensitive;
-        query += "^u_pci=" + fieldValues.u_pci;
-        // Note: u_sensitive_commercial and u_hipaa_hitech are NOT included in lookup
-        
-        gs.info("ACDC: Lookup query = " + query);
-        
-        var grUCAL = new GlideRecord('u_critical_application_lookup');
-        grUCAL.addEncodedQuery(query);
-        grUCAL.query();
-        
-        if (grUCAL.next()) {
-            var risk = grUCAL.getValue("u_critical_application_risk");
-            gs.info("ACDC: Lookup found match, risk = '" + risk + "'");
-            return risk;
-        } else {
-            gs.info("ACDC: Lookup found no match, defaulting to 'Yes'");
-            return "Yes";
+        function toString(value) {
+            if (value === "" || value === null || value === undefined) {
+                return "0";
+            }
+            var num = parseInt(value, 10);
+            if (isNaN(num)) {
+                return "0";
+            }
+            return num.toString();
         }
-    }
 
-    // ===== GET ALL BUSINESS APPS FOR THIS ASSESSMENT =====
-    
-    var businessApps = [];
-    var agg = new GlideAggregate('asmt_assessment_instance_question');
-    agg.addAggregate('COUNT', 'source_id');
-    agg.addQuery("instance", instance);
-    agg.orderBy('source_id');
-    agg.query();
-    while (agg.next()) {
-        var businessApp = agg.getValue('source_id');
-        businessApps.push(businessApp);
-    }
+        function maxValue(current, newVal) {
+            var currentInt = parseInt(current, 10) || 0;
+            var newInt = parseInt(newVal, 10) || 0;
+            var maxInt = (currentInt > newInt) ? currentInt : newInt;
+            return maxInt.toString();
+        }
 
-    gs.info("ACDC Assessment: Found " + businessApps.length + " business app(s) to process");
+        // NEW FUNCTION: Determine critical risk from lookup table (same logic as BR)
+        function getCriticalRiskFromLookup(grCCBA, fieldValues) {
+            var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
+            query += "^u_sox=" + grCCBA.getValue("u_sox");
+            query += "^u_glba=" + fieldValues.u_glba;
+            query += "^u_sensitive=" + fieldValues.u_sensitive;
+            query += "^u_pci=" + fieldValues.u_pci;
+            // Note: u_sensitive_commercial and u_hipaa_hitech are NOT included in lookup
 
-    // ===== PROCESS EACH BUSINESS APP =====
-    
-    businessApps.forEach(function(businessApp) {
-        gs.info("ACDC: ========================================");
-        gs.info("ACDC: Processing Business App: " + businessApp);
-        gs.info("ACDC: ========================================");
-        
-        var fieldValues = {
-            u_glba: "0",
-            u_sensitive: "0",
-            u_sensitive_commercial: "0",
-            u_pci: "0",
-            u_hipaa_hitech: "0"
-        };
+            gs.info("ACDC: Lookup query = " + query);
 
-        // ========================================
-        // SECTION 1: GLBA DATA TYPE PROCESSING
-        // ========================================
-        
-        var glbaDataType = getMetricValue(instance, businessApp, "glba_data_type");
-        gs.info("ACDC: [GLBA Section] Data Type = " + glbaDataType);
+            var grUCAL = new GlideRecord('u_critical_application_lookup');
+            grUCAL.addEncodedQuery(query);
+            grUCAL.query();
 
-        if (glbaDataType == "1") {
-            gs.info("ACDC: [GLBA] Processing CONSUMER path");
-            var consumerValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_consumer");
-            
-            var hasRequiredValue = hasValueInRange(consumerValues, 1, 3);
-            var hasTwoValues = consumerValues.length >= 2;
-            
-            gs.info("ACDC: [GLBA Consumer] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
-            
-            if (hasRequiredValue && hasTwoValues) {
-                var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
-                gs.info("ACDC: [GLBA Consumer] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
-                fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
-                fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, glbaHowMany);
+            if (grUCAL.next()) {
+                var risk = grUCAL.getValue("u_critical_application_risk");
+                gs.info("ACDC: Lookup found match, risk = '" + risk + "'");
+                return risk;
             } else {
-                gs.info("ACDC: [GLBA Consumer] ✗ Requirements NOT met. Fields remain 0.");
+                gs.info("ACDC: Lookup found no match, defaulting to 'Yes'");
+                return "Yes";
             }
-            
-        } else if (glbaDataType == "2") {
-            gs.info("ACDC: [GLBA] Processing COMMERCIAL path");
-            var commercialValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_commercial");
-            
-            var hasRequiredValue = hasValueInRange(commercialValues, 1, 3);
-            var hasTwoValues = commercialValues.length >= 2;
-            
-            gs.info("ACDC: [GLBA Commercial] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
-            
-            if (hasRequiredValue && hasTwoValues) {
-                var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
-                gs.info("ACDC: [GLBA Commercial] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
-                fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
-                fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
-            } else {
-                gs.info("ACDC: [GLBA Commercial] ✗ Requirements NOT met. Fields remain 0.");
-            }
-            
-        } else if (glbaDataType == "3") {
-            gs.info("ACDC: [GLBA] Processing BOTH path");
-            var bothValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_both");
-            
-            var hasRequiredValue = hasValueInRange(bothValues, 1, 3);
-            var hasTwoValues = bothValues.length >= 2;
-            
-            gs.info("ACDC: [GLBA Both] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
-            
-            if (hasRequiredValue && hasTwoValues) {
-                var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
-                gs.info("ACDC: [GLBA Both] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
-                fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
-                fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, glbaHowMany);
-                fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
-            } else {
-                gs.info("ACDC: [GLBA Both] ✗ Requirements NOT met. Fields remain 0.");
-            }
-            
-        } else if (glbaDataType == "4") {
-            gs.info("ACDC: [GLBA] NONE selected. GLBA and Sensitive fields will be 0.");
-        } else {
-            gs.info("ACDC: [GLBA] No valid data type selected or field empty.");
         }
 
-        // ========================================
-        // SECTION 2: PCI DATA PROCESSING
-        // ========================================
-        
-        var pciData = getMetricValue(instance, businessApp, "pci_data");
-        gs.info("ACDC: [PCI Section] pci_data = " + pciData);
-        
-        if (pciData == "1") {
-            gs.info("ACDC: [PCI] Processing PCI path (Yes selected)");
-            var pciValues = getMultiSelectValues(instance, businessApp, "pci_other");
-            
-            var hasTwoValues = pciValues.length >= 2;
-            
-            gs.info("ACDC: [PCI] Has 2+ selections? " + hasTwoValues);
-            
-            if (hasTwoValues) {
-                var pciHowMany = toString(getMetricValue(instance, businessApp, "pci_how_many"));
-                gs.info("ACDC: [PCI] ✓ Requirements MET. Setting values from pci_how_many = " + pciHowMany);
-                fieldValues.u_glba = maxValue(fieldValues.u_glba, pciHowMany);
-                fieldValues.u_pci = maxValue(fieldValues.u_pci, pciHowMany);
-            } else {
-                gs.info("ACDC: [PCI] ✗ Requirements NOT met (need 2+ selections). Fields remain 0.");
-            }
-        } else {
-            gs.info("ACDC: [PCI] No or field empty. PCI fields will be 0.");
+        // ===== GET ALL BUSINESS APPS FOR THIS ASSESSMENT =====
+
+        var businessApps = [];
+        var agg = new GlideAggregate('asmt_assessment_instance_question');
+        agg.addAggregate('COUNT', 'source_id');
+        agg.addQuery("instance", instance);
+        agg.orderBy('source_id');
+        agg.query();
+        while (agg.next()) {
+            var businessApp = agg.getValue('source_id');
+            businessApps.push(businessApp);
         }
 
-        // ========================================
-        // SECTION 3: HIPAA/HITECH DATA PROCESSING
-        // ========================================
-        
-        var hipaaData = getMetricValue(instance, businessApp, "hipaa_hitech_data");
-        gs.info("ACDC: [HIPAA Section] hipaa_hitech_data = " + hipaaData);
-        
-        if (hipaaData == "1") {
-            gs.info("ACDC: [HIPAA] Processing HIPAA path (Yes selected)");
-            var hipaaValues = getMultiSelectValues(instance, businessApp, "hipaa_yes");
-            
-            var hasTwoValues = hipaaValues.length >= 2;
-            
-            gs.info("ACDC: [HIPAA] Has 2+ selections? " + hasTwoValues);
-            
-            if (hasTwoValues) {
-                var hipaaHowMany = toString(getMetricValue(instance, businessApp, "hipaa_how_many"));
-                gs.info("ACDC: [HIPAA] ✓ Requirements MET. Setting value from hipaa_how_many = " + hipaaHowMany);
-                fieldValues.u_hipaa_hitech = maxValue(fieldValues.u_hipaa_hitech, hipaaHowMany);
-            } else {
-                gs.info("ACDC: [HIPAA] ✗ Requirements NOT met (need 2+ selections). Field remains 0.");
-            }
-        } else {
-            gs.info("ACDC: [HIPAA] No or field empty. HIPAA field will be 0.");
-        }
+        gs.info("ACDC Assessment: Found " + businessApps.length + " business app(s) to process");
 
-        // ========================================
-        // SECTION 4: EMPLOYEE INFO (SENSITIVE) PROCESSING
-        // ========================================
-        
-        var employeeInfo = getMetricValue(instance, businessApp, "sensitive2_employee_info");
-        gs.info("ACDC: [Employee Info Section] sensitive2_employee_info = " + employeeInfo);
-        
-        if (employeeInfo == "1") {
-            gs.info("ACDC: [Employee Info] Processing Employee Info path (Yes selected)");
-            var employeeValues = getMultiSelectValues(instance, businessApp, "sensitive2_yes");
-            
-            var hasTwoValues = employeeValues.length >= 2;
-            
-            gs.info("ACDC: [Employee Info] Has 2+ selections? " + hasTwoValues);
-            
-            if (hasTwoValues) {
-                var sensitiveHowMany = toString(getMetricValue(instance, businessApp, "sensitive2_how_many"));
-                gs.info("ACDC: [Employee Info] ✓ Requirements MET. Setting value from sensitive2_how_many = " + sensitiveHowMany);
-                fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, sensitiveHowMany);
-            } else {
-                gs.info("ACDC: [Employee Info] ✗ Requirements NOT met (need 2+ selections). Field remains 0.");
-            }
-        } else {
-            gs.info("ACDC: [Employee Info] No or field empty. Sensitive field not updated from this section.");
-        }
+        // ===== PROCESS EACH BUSINESS APP =====
 
-        // ========================================
-        // UPDATE BUSINESS APPLICATION RECORD
-        // ========================================
-        
-        gs.info("ACDC: ----------------------------------------");
-        gs.info("ACDC: FINAL VALUES for Business App " + businessApp + ":");
-        gs.info("ACDC:   u_glba = '" + fieldValues.u_glba + "' (type: " + typeof fieldValues.u_glba + ")");
-        gs.info("ACDC:   u_sensitive = '" + fieldValues.u_sensitive + "' (type: " + typeof fieldValues.u_sensitive + ")");
-        gs.info("ACDC:   u_sensitive_commercial = '" + fieldValues.u_sensitive_commercial + "' (type: " + typeof fieldValues.u_sensitive_commercial + ")");
-        gs.info("ACDC:   u_pci = '" + fieldValues.u_pci + "' (type: " + typeof fieldValues.u_pci + ")");
-        gs.info("ACDC:   u_hipaa_hitech = '" + fieldValues.u_hipaa_hitech + "' (type: " + typeof fieldValues.u_hipaa_hitech + ")");
-        gs.info("ACDC: ----------------------------------------");
-        
-        // Store answers for return value (used by BR for lookup) - keep as strings
-        answers[businessApp] = {
-            u_glba: fieldValues.u_glba,
-            u_sensitive: fieldValues.u_sensitive,
-            u_sensitive_commercial: fieldValues.u_sensitive_commercial,
-            u_pci: fieldValues.u_pci,
-            u_hipaa_hitech: fieldValues.u_hipaa_hitech
-        };
-        
-        // Only update if save=true (after RBAC approval or if no risk change)
-        if ((save && !appID) || (save && appID && businessApp == appID)) {
-            var app = new GlideRecord('cmdb_ci_business_app');
-            if (app.get(businessApp)) {
-                gs.info("ACDC: Successfully loaded business app record for UPDATE");
-                
-                // Log current values
-                gs.info("ACDC: BEFORE UPDATE - u_glba: '" + app.getValue('u_glba') + "'" +
-                       ", u_sensitive: '" + app.getValue('u_sensitive') + "'" +
-                       ", u_pci: '" + app.getValue('u_pci') + "'" +
-                       ", u_hipaa_hitech: '" + app.getValue('u_hipaa_hitech') + "'" +
-                       ", u_critical_application_risk: '" + app.getValue('u_critical_application_risk') + "'");
-                
-                // Set field values as STRINGS (choice field values)
-                app.setValue('u_glba', fieldValues.u_glba);
-                app.setValue('u_sensitive', fieldValues.u_sensitive);
-                app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-                app.setValue('u_pci', fieldValues.u_pci);
-                app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
-                
-                // NEW: Determine and set u_critical_application_risk using lookup table
-                var newRisk = getCriticalRiskFromLookup(app, fieldValues);
-                app.setValue('u_critical_application_risk', newRisk);
-                gs.info("ACDC: Setting u_critical_application_risk = '" + newRisk + "'");
-                
-                app.update();
-                gs.info("ACDC: ✓ Business app record UPDATED in database");
-                
-                // Verify the update
-                var verify = new GlideRecord('cmdb_ci_business_app');
-                if (verify.get(businessApp)) {
-                    gs.info("ACDC: VERIFICATION - After update:");
-                    gs.info("ACDC:   u_glba = '" + verify.getValue('u_glba') + "'");
-                    gs.info("ACDC:   u_sensitive = '" + verify.getValue('u_sensitive') + "'");
-                    gs.info("ACDC:   u_pci = '" + verify.getValue('u_pci') + "'");
-                    gs.info("ACDC:   u_hipaa_hitech = '" + verify.getValue('u_hipaa_hitech') + "'");
-                    gs.info("ACDC:   u_sensitive_commercial = '" + verify.getValue('u_sensitive_commercial') + "'");
-                    gs.info("ACDC:   u_critical_application_risk = '" + verify.getValue('u_critical_application_risk') + "'");
+        businessApps.forEach(function(businessApp) {
+            gs.info("ACDC: ========================================");
+            gs.info("ACDC: Processing Business App: " + businessApp);
+            gs.info("ACDC: ========================================");
+
+            var fieldValues = {
+                u_glba: "0",
+                u_sensitive: "0",
+                u_sensitive_commercial: "0",
+                u_pci: "0",
+                u_hipaa_hitech: "0"
+            };
+
+            // ========================================
+            // SECTION 1: GLBA DATA TYPE PROCESSING
+            // ========================================
+
+            var glbaDataType = getMetricValue(instance, businessApp, "glba_data_type");
+            gs.info("ACDC: [GLBA Section] Data Type = " + glbaDataType);
+
+            if (glbaDataType == "1") {
+                gs.info("ACDC: [GLBA] Processing CONSUMER path");
+                var consumerValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_consumer");
+
+                var hasRequiredValue = hasValueInRange(consumerValues, 1, 3);
+                var hasTwoValues = consumerValues.length >= 2;
+
+                gs.info("ACDC: [GLBA Consumer] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
+
+                if (hasRequiredValue && hasTwoValues) {
+                    var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
+                    gs.info("ACDC: [GLBA Consumer] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
+                    fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, glbaHowMany);
+                } else {
+                    gs.info("ACDC: [GLBA Consumer] ✗ Requirements NOT met. Fields remain 0.");
+                }
+
+            } else if (glbaDataType == "2") {
+                gs.info("ACDC: [GLBA] Processing COMMERCIAL path");
+                var commercialValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_commercial");
+
+                var hasRequiredValue = hasValueInRange(commercialValues, 1, 3);
+                var hasTwoValues = commercialValues.length >= 2;
+
+                gs.info("ACDC: [GLBA Commercial] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
+
+                if (hasRequiredValue && hasTwoValues) {
+                    var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
+                    gs.info("ACDC: [GLBA Commercial] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
+                    fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
+                } else {
+                    gs.info("ACDC: [GLBA Commercial] ✗ Requirements NOT met. Fields remain 0.");
+                }
+
+            } else if (glbaDataType == "3") {
+                gs.info("ACDC: [GLBA] Processing BOTH path");
+                var bothValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_both");
+
+                var hasRequiredValue = hasValueInRange(bothValues, 1, 3);
+                var hasTwoValues = bothValues.length >= 2;
+
+                gs.info("ACDC: [GLBA Both] Has value 1-3? " + hasRequiredValue + ", Has 2+ selections? " + hasTwoValues);
+
+                if (hasRequiredValue && hasTwoValues) {
+                    var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
+                    gs.info("ACDC: [GLBA Both] ✓ Requirements MET. Setting values from glba_how_many = " + glbaHowMany);
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
+                    fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, glbaHowMany);
+                    fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
+                } else {
+                    gs.info("ACDC: [GLBA Both] ✗ Requirements NOT met. Fields remain 0.");
+                }
+
+            } else if (glbaDataType == "4") {
+                gs.info("ACDC: [GLBA] NONE selected. GLBA and Sensitive fields will be 0.");
+            } else {
+                gs.info("ACDC: [GLBA] No valid data type selected or field empty.");
+            }
+
+            // ========================================
+            // SECTION 2: PCI DATA PROCESSING
+            // ========================================
+
+            var pciData = getMetricValue(instance, businessApp, "pci_data");
+            gs.info("ACDC: [PCI Section] pci_data = " + pciData);
+
+            if (pciData == "1") {
+                gs.info("ACDC: [PCI] Processing PCI path (Yes selected)");
+                var pciValues = getMultiSelectValues(instance, businessApp, "pci_other");
+
+                var hasTwoValues = pciValues.length >= 2;
+
+                gs.info("ACDC: [PCI] Has 2+ selections? " + hasTwoValues);
+
+                if (hasTwoValues) {
+                    var pciHowMany = toString(getMetricValue(instance, businessApp, "pci_how_many"));
+                    gs.info("ACDC: [PCI] ✓ Requirements MET. Setting values from pci_how_many = " + pciHowMany);
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, pciHowMany);
+                    fieldValues.u_pci = maxValue(fieldValues.u_pci, pciHowMany);
+                } else {
+                    gs.info("ACDC: [PCI] ✗ Requirements NOT met (need 2+ selections). Fields remain 0.");
                 }
             } else {
-                gs.error("ACDC: ✗ ERROR: Could not load business app record: " + businessApp);
+                gs.info("ACDC: [PCI] No or field empty. PCI fields will be 0.");
             }
-        } else {
-            gs.info("ACDC: ○ Business app record NOT saved (preview mode or different appID)");
-            gs.info("ACDC:   Reason: save=" + save + ", appID=" + appID + ", current businessApp=" + businessApp);
-        }
-    });
 
-    gs.info("ACDC Assessment: ======== PROCESSING COMPLETE ========");
-    gs.info("ACDC Assessment: Final answers object: " + JSON.stringify(answers));
-    return answers;
-},
+            // ========================================
+            // SECTION 3: HIPAA/HITECH DATA PROCESSING
+            // ========================================
+
+            var hipaaData = getMetricValue(instance, businessApp, "hipaa_hitech_data");
+            gs.info("ACDC: [HIPAA Section] hipaa_hitech_data = " + hipaaData);
+
+            if (hipaaData == "1") {
+                gs.info("ACDC: [HIPAA] Processing HIPAA path (Yes selected)");
+                var hipaaValues = getMultiSelectValues(instance, businessApp, "hipaa_yes");
+
+                var hasTwoValues = hipaaValues.length >= 2;
+
+                gs.info("ACDC: [HIPAA] Has 2+ selections? " + hasTwoValues);
+
+                if (hasTwoValues) {
+                    var hipaaHowMany = toString(getMetricValue(instance, businessApp, "hipaa_how_many"));
+                    gs.info("ACDC: [HIPAA] ✓ Requirements MET. Setting value from hipaa_how_many = " + hipaaHowMany);
+                    fieldValues.u_hipaa_hitech = maxValue(fieldValues.u_hipaa_hitech, hipaaHowMany);
+                } else {
+                    gs.info("ACDC: [HIPAA] ✗ Requirements NOT met (need 2+ selections). Field remains 0.");
+                }
+            } else {
+                gs.info("ACDC: [HIPAA] No or field empty. HIPAA field will be 0.");
+            }
+
+            // ========================================
+            // SECTION 4: EMPLOYEE INFO (SENSITIVE) PROCESSING
+            // ========================================
+
+            var employeeInfo = getMetricValue(instance, businessApp, "sensitive2_employee_info");
+            gs.info("ACDC: [Employee Info Section] sensitive2_employee_info = " + employeeInfo);
+
+            if (employeeInfo == "1") {
+                gs.info("ACDC: [Employee Info] Processing Employee Info path (Yes selected)");
+                var employeeValues = getMultiSelectValues(instance, businessApp, "sensitive2_yes");
+
+                var hasTwoValues = employeeValues.length >= 2;
+
+                gs.info("ACDC: [Employee Info] Has 2+ selections? " + hasTwoValues);
+
+                if (hasTwoValues) {
+                    var sensitiveHowMany = toString(getMetricValue(instance, businessApp, "sensitive2_how_many"));
+                    gs.info("ACDC: [Employee Info] ✓ Requirements MET. Setting value from sensitive2_how_many = " + sensitiveHowMany);
+                    fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, sensitiveHowMany);
+                } else {
+                    gs.info("ACDC: [Employee Info] ✗ Requirements NOT met (need 2+ selections). Field remains 0.");
+                }
+            } else {
+                gs.info("ACDC: [Employee Info] No or field empty. Sensitive field not updated from this section.");
+            }
+
+            // ========================================
+            // UPDATE BUSINESS APPLICATION RECORD
+            // ========================================
+
+            gs.info("ACDC: ----------------------------------------");
+            gs.info("ACDC: FINAL VALUES for Business App " + businessApp + ":");
+            gs.info("ACDC:   u_glba = '" + fieldValues.u_glba + "' (type: " + typeof fieldValues.u_glba + ")");
+            gs.info("ACDC:   u_sensitive = '" + fieldValues.u_sensitive + "' (type: " + typeof fieldValues.u_sensitive + ")");
+            gs.info("ACDC:   u_sensitive_commercial = '" + fieldValues.u_sensitive_commercial + "' (type: " + typeof fieldValues.u_sensitive_commercial + ")");
+            gs.info("ACDC:   u_pci = '" + fieldValues.u_pci + "' (type: " + typeof fieldValues.u_pci + ")");
+            gs.info("ACDC:   u_hipaa_hitech = '" + fieldValues.u_hipaa_hitech + "' (type: " + typeof fieldValues.u_hipaa_hitech + ")");
+            gs.info("ACDC: ----------------------------------------");
+
+            // Store answers for return value (used by BR for lookup) - keep as strings
+            answers[businessApp] = {
+                u_glba: fieldValues.u_glba,
+                u_sensitive: fieldValues.u_sensitive,
+                u_sensitive_commercial: fieldValues.u_sensitive_commercial,
+                u_pci: fieldValues.u_pci,
+                u_hipaa_hitech: fieldValues.u_hipaa_hitech
+            };
+
+            // Only update if save=true (after RBAC approval or if no risk change)
+            if ((save && !appID) || (save && appID && businessApp == appID)) {
+                var app = new GlideRecord('cmdb_ci_business_app');
+                if (app.get(businessApp)) {
+                    gs.info("ACDC: Successfully loaded business app record for UPDATE");
+
+                    // Log current values
+                    gs.info("ACDC: BEFORE UPDATE - u_glba: '" + app.getValue('u_glba') + "'" +
+                        ", u_sensitive: '" + app.getValue('u_sensitive') + "'" +
+                        ", u_pci: '" + app.getValue('u_pci') + "'" +
+                        ", u_hipaa_hitech: '" + app.getValue('u_hipaa_hitech') + "'" +
+                        ", u_critical_application_risk: '" + app.getValue('u_critical_application_risk') + "'");
+
+                    // Set field values as STRINGS (choice field values)
+                    app.setValue('u_glba', fieldValues.u_glba);
+                    app.setValue('u_sensitive', fieldValues.u_sensitive);
+                    app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+                    app.setValue('u_pci', fieldValues.u_pci);
+                    app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+
+                    // NEW: Determine and set u_critical_application_risk using lookup table
+                    var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+                    app.setValue('u_critical_application_risk', newRisk);
+                    gs.info("ACDC: Setting u_critical_application_risk = '" + newRisk + "'");
+
+                    app.update();
+                    gs.info("ACDC: ✓ Business app record UPDATED in database");
+
+                    // Verify the update
+                    var verify = new GlideRecord('cmdb_ci_business_app');
+                    if (verify.get(businessApp)) {
+                        gs.info("ACDC: VERIFICATION - After update:");
+                        gs.info("ACDC:   u_glba = '" + verify.getValue('u_glba') + "'");
+                        gs.info("ACDC:   u_sensitive = '" + verify.getValue('u_sensitive') + "'");
+                        gs.info("ACDC:   u_pci = '" + verify.getValue('u_pci') + "'");
+                        gs.info("ACDC:   u_hipaa_hitech = '" + verify.getValue('u_hipaa_hitech') + "'");
+                        gs.info("ACDC:   u_sensitive_commercial = '" + verify.getValue('u_sensitive_commercial') + "'");
+                        gs.info("ACDC:   u_critical_application_risk = '" + verify.getValue('u_critical_application_risk') + "'");
+                    }
+                } else {
+                    gs.error("ACDC: ✗ ERROR: Could not load business app record: " + businessApp);
+                }
+            } else {
+                gs.info("ACDC: ○ Business app record NOT saved (preview mode or different appID)");
+                gs.info("ACDC:   Reason: save=" + save + ", appID=" + appID + ", current businessApp=" + businessApp);
+            }
+        });
+
+        gs.info("ACDC Assessment: ======== PROCESSING COMPLETE ========");
+        gs.info("ACDC Assessment: Final answers object: " + JSON.stringify(answers));
+        return answers;
+    },
+
+    type: 'HGC_ACDC_Utils'
+};
