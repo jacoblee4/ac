@@ -1,15 +1,15 @@
 (function executeRule(current, previous /*null when async*/) {
 
-	var answers = new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, false);
-	var businessApps = Object.keys(answers);
+    var answers = new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, false);
+    var businessApps = Object.keys(answers);
 
-	businessApps.forEach(function(app){
-		var canSave = false;
-		var grCCBA = new GlideRecord('cmdb_ci_business_app');
-		if (grCCBA.get(app)) {
-			var field = "u_critical_application_risk";
-			var previousRisk = grCCBA.getValue(field);
-			var currentRisk = "";
+    businessApps.forEach(function(app){
+        var canSave = false;
+        var grCCBA = new GlideRecord('cmdb_ci_business_app');
+        if (grCCBA.get(app)) {
+            var field = "u_critical_application_risk";
+            var previousRisk = grCCBA.getValue(field);
+            var currentRisk = "";
 
             // getting the query to find the value from the matrix
             var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
@@ -18,29 +18,49 @@
             var values = Object.keys(answers[app]);
             values.forEach(function (key) {
                 if(key != "u_hipaa_hitech" && key != "u_sensitive_commercial")
-                query += "^" + key + "=" + answers[app][key];
+                    query += "^" + key + "=" + answers[app][key];
             });
+
+            gs.info("ACDC BR: Business App = " + app);
+            gs.info("ACDC BR: u_rbac_exempt = " + grCCBA.getValue("u_rbac_exempt"));
+            gs.info("ACDC BR: u_sox = " + grCCBA.getValue("u_sox"));
+            gs.info("ACDC BR: Lookup query = " + query);
+            gs.info("ACDC BR: Answers object = " + JSON.stringify(answers[app]));
 
             var grUCAL = new GlideRecord('u_critical_application_lookup');
             grUCAL.addEncodedQuery(query);
             grUCAL.query();
+            
+            var rowCount = grUCAL.getRowCount();
+            gs.info("ACDC BR: Lookup query returned " + rowCount + " record(s)");
+            
             if (grUCAL.next()) {
                 currentRisk = grUCAL.getValue("u_critical_application_risk");
-            }else{
-				currentRisk = "Yes";
-			}
+                gs.info("ACDC BR: Found match! Record sys_id = " + grUCAL.sys_id);
+                gs.info("ACDC BR: Matched record has u_critical_application_risk = '" + currentRisk + "'");
+            } else {
+                currentRisk = "Yes";
+                gs.info("ACDC BR: No match found in lookup table, defaulting to currentRisk = 'Yes'");
+            }
 
-			var riskChangedFromNoToYes = previousRisk == "No" && currentRisk == "Yes";
-			var riskChangedFromYesToNo = (previousRisk == "Yes" || previousRisk == "YesRBAC") && currentRisk == "No";
+            gs.info("ACDC BR: previousRisk = '" + previousRisk + "', currentRisk = '" + currentRisk + "'");
 
-			if(riskChangedFromNoToYes || riskChangedFromYesToNo){
-				//generate the req
-				new HGC_ACDC_Utils().generateRBACRequest( app, current.sys_id, currentRisk);
-			}else{
-				//save
-				new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, true, app);
-			}
-		}	
-	});
+            var riskChangedFromNoToYes = previousRisk == "No" && currentRisk == "Yes";
+            var riskChangedFromYesToNo = (previousRisk == "Yes" || previousRisk == "YesRBAC") && currentRisk == "No";
+
+            gs.info("ACDC BR: riskChangedFromNoToYes = " + riskChangedFromNoToYes);
+            gs.info("ACDC BR: riskChangedFromYesToNo = " + riskChangedFromYesToNo);
+
+            if(riskChangedFromNoToYes || riskChangedFromYesToNo){
+                gs.info("ACDC BR: Risk IS changing - generating RBAC request");
+                //generate the req
+                new HGC_ACDC_Utils().generateRBACRequest(app, current.sys_id, currentRisk);
+            } else {
+                gs.info("ACDC BR: Risk NOT changing - saving directly");
+                //save
+                new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, true, app);
+            }
+        }	
+    });
 
 })(current, previous);
