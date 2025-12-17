@@ -1,0 +1,49 @@
+(function executeRule(current, previous /*null when async*/) {
+
+    var answers = new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, false);
+    var businessApps = Object.keys(answers);
+
+    businessApps.forEach(function(app){
+        var canSave = false;
+        var grCCBA = new GlideRecord('cmdb_ci_business_app');
+        if (grCCBA.get(app)) {
+            var field = "u_critical_application_risk";
+            var previousRisk = grCCBA.getValue(field);
+            var currentRisk = "";
+
+            // getting the query to find the value from the matrix
+            var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
+            query += "^u_sox=" + grCCBA.getValue("u_sox");
+
+            var values = Object.keys(answers[app]);
+            values.forEach(function (key) {
+                if(key != "u_hipaa_hitech" && key != "u_sensitive_commercial")
+                    query += "^" + key + "=" + answers[app][key];
+            });
+
+            var grUCAL = new GlideRecord('u_critical_application_lookup');
+            grUCAL.addEncodedQuery(query);
+            grUCAL.query();
+            
+            var rowCount = grUCAL.getRowCount();
+            
+            if (grUCAL.next()) {
+                currentRisk = grUCAL.getValue("u_critical_application_risk");
+            } else {
+                currentRisk = "Yes";
+            }
+
+            var riskChangedFromNoToYes = previousRisk == "No" && currentRisk == "Yes";
+            var riskChangedFromYesToNo = (previousRisk == "Yes" || previousRisk == "YesRBAC") && currentRisk == "No";
+
+            if(riskChangedFromNoToYes || riskChangedFromYesToNo){
+                //generate the req
+                new HGC_ACDC_Utils().generateRBACRequest(app, current.sys_id, currentRisk);
+            } else {
+                //save
+                new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, true, app);
+            }
+        }	
+    });
+
+})(current, previous);
