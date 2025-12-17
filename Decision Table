@@ -1,0 +1,66 @@
+Critical Application (Risk)	NPI\GLBA	PCI	RBAC Exempt	Sensitive	ICFR\SOX
+No	No	No	FALSE	No	No
+No	No	No	TRUE	No	No
+Yes	No	No	FALSE	Yes - 1 - 1000 (Low)	No
+Yes	Yes - 1001 - 10000 (Moderate)	No	FALSE	Yes - Greater than 10000 (High)	No
+Yes	No	Yes - 1 -  1000 (Low)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	No	No	FALSE	Yes - 1001 - 10000 (Moderate)	No
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1 -  1000 (Low)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - 1 -  1000 (Low)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	No	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - 1 -  1000 (Low)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - 1001 - 10000 (Moderate)	FALSE	No	Yes
+Yes	No	Yes - Greater than 10000 (High)	FALSE	No	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - Greater than 10000 (High)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - Greater than 10000 (High)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - Greater than 10000 (High)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1 - 1000 (Low)	No	FALSE	No	No
+Yes	Yes - 1 - 1000 (Low)	No	FALSE	Yes - 1 - 1000 (Low)	No
+Yes	Yes - Greater than 10000 (High)	No	FALSE	Yes - Greater than 10000 (High)	No
+Yes	Yes - 1 - 1000 (Low)	Yes - 1 -  1000 (Low)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1 - 1000 (Low)	No	FALSE	Yes - 1001 - 10000 (Moderate)	No
+Yes	Yes - Greater than 10000 (High)	Yes - 1 -  1000 (Low)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	No	Yes - 1001 - 10000 (Moderate)	FALSE	No	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - Greater than 10000 (High)	FALSE	No	Yes
+Yes	No	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - Greater than 10000 (High)	FALSE	No	Yes
+Yes	No	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - Greater than 10000 (High)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - Greater than 10000 (High)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - Greater than 10000 (High)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - Greater than 10000 (High)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	No	FALSE	Yes - 1 - 1000 (Low)	No
+Yes	Yes - 1001 - 10000 (Moderate)	No	FALSE	No	No
+Yes	No	Yes - 1 -  1000 (Low)	FALSE	No	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1 -  1000 (Low)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	No	FALSE	Yes - 1001 - 10000 (Moderate)	No
+Yes	No	No	FALSE	Yes - Greater than 10000 (High)	No
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1 -  1000 (Low)	FALSE	No	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - 1 -  1000 (Low)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	No	Yes - 1 -  1000 (Low)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - 1001 - 10000 (Moderate)	FALSE	No	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - Greater than 10000 (High)	FALSE	No	Yes
+Yes	No	Yes - Greater than 10000 (High)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	No	Yes - Greater than 10000 (High)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - Greater than 10000 (High)	No	FALSE	No	No
+Yes	Yes - Greater than 10000 (High)	No	FALSE	Yes - 1001 - 10000 (Moderate)	No
+Yes	Yes - 1 - 1000 (Low)	No	FALSE	Yes - Greater than 10000 (High)	No
+Yes	Yes - Greater than 10000 (High)	Yes - 1 -  1000 (Low)	FALSE	No	Yes
+Yes	No	Yes - 1 -  1000 (Low)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - Greater than 10000 (High)	No	FALSE	Yes - 1 - 1000 (Low)	No
+Yes	Yes - 1 - 1000 (Low)	Yes - 1 -  1000 (Low)	FALSE	No	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - 1 -  1000 (Low)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1 -  1000 (Low)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1001 - 10000 (Moderate)	FALSE	No	Yes
+Yes	Yes - Greater than 10000 (High)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	Yes - 1001 - 10000 (Moderate)	Yes - 1001 - 10000 (Moderate)	FALSE	Yes - 1 - 1000 (Low)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - Greater than 10000 (High)	FALSE	Yes - 1001 - 10000 (Moderate)	Yes
+Yes	Yes - 1 - 1000 (Low)	Yes - Greater than 10000 (High)	FALSE	Yes - Greater than 10000 (High)	Yes
+Yes	No	Yes - Greater than 10000 (High)	FALSE	Yes - 1 - 1000 (Low)	Yes
