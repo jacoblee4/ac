@@ -16,10 +16,21 @@
             query += "^u_sox=" + grCCBA.getValue("u_sox");
 
             var values = Object.keys(answers[app]);
-            values.forEach(function (key) {
-                if(key != "u_hipaa_hitech" && key != "u_sensitive_commercial")
-                    query += "^" + key + "=" + answers[app][key];
-            });
+
+// Combine sensitive and sensitive_commercial before building query
+var sensitiveInt = parseInt(answers[app].u_sensitive, 10) || 0;
+var commercialInt = parseInt(answers[app].u_sensitive_commercial, 10) || 0;
+var combinedSensitive = (sensitiveInt > commercialInt) ? answers[app].u_sensitive : answers[app].u_sensitive_commercial;
+
+values.forEach(function (key) {
+    if(key != "u_hipaa_hitech" && key != "u_sensitive_commercial") {
+        if(key == "u_sensitive") {
+            query += "^" + key + "=" + combinedSensitive;
+        } else {
+            query += "^" + key + "=" + answers[app][key];
+        }
+    }
+});
 
             var grUCAL = new GlideRecord('u_critical_application_lookup');
             grUCAL.addEncodedQuery(query);
