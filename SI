@@ -1,0 +1,236 @@
+var HGC_ACDC_Utils = Class.create();
+HGC_ACDC_Utils.prototype = {
+
+    initialize: function() {},
+
+    generateRBACRequest: function(appID, assessmentID, newRiskValue) {
+        var grCCBA = new GlideRecord('cmdb_ci_business_app');
+        if (grCCBA.get(appID)) {
+            var cartId = GlideGuid.generate(null);
+            var cart = new Cart(cartId);
+            var item = cart.addItem('4862631edb509550b37a622dca96197f');
+            cart.setVariable(item, 'requested_for', grCCBA.owned_by);
+            cart.setVariable(item, 'opened_by', grCCBA.owned_by);
+            cart.setVariable(item, 'critical_application', newRiskValue);
+            cart.setVariable(item, 'assessment_record', assessmentID);
+            cart.setVariable(item, 'business_application', grCCBA.sys_id);
+            var rc = cart.placeOrder();
+
+            var req = new GlideRecord('sc_req_item');
+            req.addQuery('request', rc.sys_id);
+            req.query();
+            while (req.next()) {
+                req.cmdb_ci = grCCBA.sys_id;
+                req.description = req.comments = "Created because the 'Critical Application (Risk)' is changing from " +
+                    grCCBA.u_critical_application_risk.getDisplayValue() + " to " + newRiskValue;
+                req.update();
+            }
+            gs.addInfoMessage("RBAC Manage ACDC Survey Request was created");
+        }
+    },
+
+    saveAssessementToBusinessApps: function(current, save, appID) {
+        var answers = {};
+        var instance = current.getUniqueValue();
+
+        function getMetricValue(instance, businessApp, fieldName) {
+            var gr = new GlideRecord('asmt_assessment_instance_question');
+            gr.addQuery("source_id", businessApp);
+            gr.addQuery("instance", instance);
+            gr.addQuery("metric.name", fieldName);
+            gr.query();
+            if (gr.next()) {
+                return gr.getValue("value");
+            }
+            return "";
+        }
+
+        function getMultiSelectValues(instance, businessApp, fieldName) {
+            var values = [];
+            var gr = new GlideRecord('asmt_assessment_instance_question');
+            gr.addQuery("source_id", businessApp);
+            gr.addQuery("instance", instance);
+            gr.addQuery("metric.name", fieldName);
+            gr.query();
+
+            while (gr.next()) {
+                var value = gr.getValue("value");
+                if (value && value != "0" && value != "") {
+                    values.push(parseInt(value, 10));
+                }
+            }
+            return values;
+        }
+
+        function hasValueInRange(values, min, max) {
+            for (var i = 0; i < values.length; i++) {
+                if (values[i] >= min && values[i] <= max) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function toString(value) {
+            if (value === "" || value === null || value === undefined) {
+                return "0";
+            }
+            var num = parseInt(value, 10);
+            if (isNaN(num)) {
+                return "0";
+            }
+            return num.toString();
+        }
+
+        function maxValue(current, newVal) {
+            var currentInt = parseInt(current, 10) || 0;
+            var newInt = parseInt(newVal, 10) || 0;
+            var maxInt = (currentInt > newInt) ? currentInt : newInt;
+            return maxInt.toString();
+        }
+
+        function getCriticalRiskFromLookup(grCCBA, fieldValues) {
+            var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
+            query += "^u_sox=" + grCCBA.getValue("u_sox");
+            query += "^u_glba=" + fieldValues.u_glba;
+            query += "^u_sensitive=" + fieldValues.u_sensitive;
+            query += "^u_pci=" + fieldValues.u_pci;
+
+            var grUCAL = new GlideRecord('u_critical_application_lookup');
+            grUCAL.addEncodedQuery(query);
+            grUCAL.query();
+
+            if (grUCAL.next()) {
+                return grUCAL.getValue("u_critical_application_risk");
+            } else {
+                return "Yes";
+            }
+        }
+
+        var businessApps = [];
+        var agg = new GlideAggregate('asmt_assessment_instance_question');
+        agg.addAggregate('COUNT', 'source_id');
+        agg.addQuery("instance", instance);
+        agg.orderBy('source_id');
+        agg.query();
+        while (agg.next()) {
+            var businessApp = agg.getValue('source_id');
+            businessApps.push(businessApp);
+        }
+
+        businessApps.forEach(function(businessApp) {
+            var fieldValues = {
+                u_glba: "0",
+                u_sensitive: "0",
+                u_sensitive_commercial: "0",
+                u_pci: "0",
+                u_hipaa_hitech: "0"
+            };
+
+            var glbaDataType = getMetricValue(instance, businessApp, "glba_data_type");
+
+            // CONSUMER: Only updates u_glba
+            if (glbaDataType == "1") {
+                var consumerValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_consumer");
+                var hasRequiredValue = hasValueInRange(consumerValues, 1, 3);
+                var hasTwoValues = consumerValues.length >= 2;
+
+                if (hasRequiredValue && hasTwoValues) {
+                    var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
+                }
+
+                // COMMERCIAL: Updates u_glba and u_sensitive_commercial
+            } else if (glbaDataType == "2") {
+                var commercialValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_commercial");
+                var hasRequiredValue = hasValueInRange(commercialValues, 1, 3);
+                var hasTwoValues = commercialValues.length >= 2;
+
+                if (hasRequiredValue && hasTwoValues) {
+                    var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
+                    fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
+                }
+
+                // BOTH: Only updates u_glba and u_sensitive_commercial (no longer updates u_sensitive)
+            } else if (glbaDataType == "3") {
+                var bothValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_both");
+                var hasRequiredValue = hasValueInRange(bothValues, 1, 3);
+                var hasTwoValues = bothValues.length >= 2;
+
+                if (hasRequiredValue && hasTwoValues) {
+                    var glbaHowMany = toString(getMetricValue(instance, businessApp, "glba_how_many"));
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
+                    fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
+                }
+            }
+
+            // PCI: Updates u_glba and u_pci
+            var pciData = getMetricValue(instance, businessApp, "pci_data");
+
+            if (pciData == "1") {
+                var pciValues = getMultiSelectValues(instance, businessApp, "pci_other");
+                var hasTwoValues = pciValues.length >= 2;
+
+                if (hasTwoValues) {
+                    var pciHowMany = toString(getMetricValue(instance, businessApp, "pci_how_many"));
+                    fieldValues.u_glba = maxValue(fieldValues.u_glba, pciHowMany);
+                    fieldValues.u_pci = maxValue(fieldValues.u_pci, pciHowMany);
+                }
+            }
+
+            // HIPAA: Updates u_hipaa_hitech only
+            var hipaaData = getMetricValue(instance, businessApp, "hipaa_hitech_data");
+
+            if (hipaaData == "1") {
+                var hipaaValues = getMultiSelectValues(instance, businessApp, "hipaa_yes");
+                var hasTwoValues = hipaaValues.length >= 2;
+
+                if (hasTwoValues) {
+                    var hipaaHowMany = toString(getMetricValue(instance, businessApp, "hipaa_how_many"));
+                    fieldValues.u_hipaa_hitech = maxValue(fieldValues.u_hipaa_hitech, hipaaHowMany);
+                }
+            }
+
+            // EMPLOYEE INFO: Updates u_sensitive only
+            var employeeInfo = getMetricValue(instance, businessApp, "sensitive2_employee_info");
+
+            if (employeeInfo == "1") {
+                var employeeValues = getMultiSelectValues(instance, businessApp, "sensitive2_yes");
+                var hasTwoValues = employeeValues.length >= 2;
+
+                if (hasTwoValues) {
+                    var sensitiveHowMany = toString(getMetricValue(instance, businessApp, "sensitive2_how_many"));
+                    fieldValues.u_sensitive = maxValue(fieldValues.u_sensitive, sensitiveHowMany);
+                }
+            }
+
+            answers[businessApp] = {
+                u_glba: fieldValues.u_glba,
+                u_sensitive: fieldValues.u_sensitive,
+                u_sensitive_commercial: fieldValues.u_sensitive_commercial,
+                u_pci: fieldValues.u_pci,
+                u_hipaa_hitech: fieldValues.u_hipaa_hitech
+            };
+
+            if ((save && !appID) || (save && appID && businessApp == appID)) {
+                var app = new GlideRecord('cmdb_ci_business_app');
+                if (app.get(businessApp)) {
+                    app.setValue('u_glba', fieldValues.u_glba);
+                    app.setValue('u_sensitive', fieldValues.u_sensitive);
+                    app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+                    app.setValue('u_pci', fieldValues.u_pci);
+                    app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+
+                    var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+                    app.setValue('u_critical_application_risk', newRisk);
+
+                    app.update();
+                }
+            }
+        });
+
+        return answers;
+    },
+
+    type: 'HGC_ACDC_Utils'
+};
