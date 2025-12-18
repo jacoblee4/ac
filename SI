@@ -90,22 +90,27 @@ HGC_ACDC_Utils.prototype = {
         }
 
         function getCriticalRiskFromLookup(grCCBA, fieldValues) {
-            var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
-            query += "^u_sox=" + grCCBA.getValue("u_sox");
-            query += "^u_glba=" + fieldValues.u_glba;
-            query += "^u_sensitive=" + fieldValues.u_sensitive;
-            query += "^u_pci=" + fieldValues.u_pci;
+    // Combine sensitive and sensitive_commercial
+    var sensitiveInt = parseInt(fieldValues.u_sensitive, 10) || 0;
+    var commercialInt = parseInt(fieldValues.u_sensitive_commercial, 10) || 0;
+    var combinedSensitive = (sensitiveInt > commercialInt) ? fieldValues.u_sensitive : fieldValues.u_sensitive_commercial;
+    
+    var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
+    query += "^u_sox=" + grCCBA.getValue("u_sox");
+    query += "^u_glba=" + fieldValues.u_glba;
+    query += "^u_sensitive=" + combinedSensitive;
+    query += "^u_pci=" + fieldValues.u_pci;
 
-            var grUCAL = new GlideRecord('u_critical_application_lookup');
-            grUCAL.addEncodedQuery(query);
-            grUCAL.query();
+    var grUCAL = new GlideRecord('u_critical_application_lookup');
+    grUCAL.addEncodedQuery(query);
+    grUCAL.query();
 
-            if (grUCAL.next()) {
-                return grUCAL.getValue("u_critical_application_risk");
-            } else {
-                return "Yes";
-            }
-        }
+    if (grUCAL.next()) {
+        return grUCAL.getValue("u_critical_application_risk");
+    } else {
+        return "Yes";
+    }
+}
 
         var businessApps = [];
         var agg = new GlideAggregate('asmt_assessment_instance_question');
