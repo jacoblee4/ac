@@ -29,7 +29,7 @@ HGC_ACDC_Utils.prototype = {
         }
     },
 
-    saveAssessementToBusinessApps: function(current, save, appID) {
+    saveAssessementToBusinessApps: function(current, save, appID, updateRisk) {
         var answers = {};
         var instance = current.getUniqueValue();
 
@@ -89,20 +89,20 @@ HGC_ACDC_Utils.prototype = {
             return maxInt.toString();
         }
 
-      function getCriticalRiskFromLookup(grCCBA, fieldValues) {
-    // Simple logic: if any sensitive data exists, risk = Yes
-    var hasGLBA = parseInt(fieldValues.u_glba, 10) > 0;
-    var hasSensitive = parseInt(fieldValues.u_sensitive, 10) > 0;
-    var hasCommercial = parseInt(fieldValues.u_sensitive_commercial, 10) > 0;
-    var hasPCI = parseInt(fieldValues.u_pci, 10) > 0;
-    var hasHIPAA = parseInt(fieldValues.u_hipaa_hitech, 10) > 0;
-    
-    if (hasGLBA || hasSensitive || hasCommercial || hasPCI || hasHIPAA) {
-        return "Yes";
-    } else {
-        return "No";
-    }
-}
+        function getCriticalRiskFromLookup(grCCBA, fieldValues) {
+            // Simple logic: if any sensitive data exists, risk = Yes
+            var hasGLBA = parseInt(fieldValues.u_glba, 10) > 0;
+            var hasSensitive = parseInt(fieldValues.u_sensitive, 10) > 0;
+            var hasCommercial = parseInt(fieldValues.u_sensitive_commercial, 10) > 0;
+            var hasPCI = parseInt(fieldValues.u_pci, 10) > 0;
+            var hasHIPAA = parseInt(fieldValues.u_hipaa_hitech, 10) > 0;
+            
+            if (hasGLBA || hasSensitive || hasCommercial || hasPCI || hasHIPAA) {
+                return "Yes";
+            } else {
+                return "No";
+            }
+        }
 
         var businessApps = [];
         var agg = new GlideAggregate('asmt_assessment_instance_question');
@@ -137,7 +137,7 @@ HGC_ACDC_Utils.prototype = {
                     fieldValues.u_glba = maxValue(fieldValues.u_glba, glbaHowMany);
                 }
 
-            // COMMERCIAL: Updates u_glba and u_sensitive_commercial
+            // COMMERCIAL: Updates u_sensitive_commercial only
             } else if (glbaDataType == "2") {
                 var commercialValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_commercial");
                 var hasRequiredValue = hasValueInRange(commercialValues, 1, 3);
@@ -148,7 +148,7 @@ HGC_ACDC_Utils.prototype = {
                     fieldValues.u_sensitive_commercial = maxValue(fieldValues.u_sensitive_commercial, glbaHowMany);
                 }
 
-            // BOTH: Only updates u_glba and u_sensitive_commercial (no longer updates u_sensitive)
+            // BOTH: Updates u_glba and u_sensitive_commercial
             } else if (glbaDataType == "3") {
                 var bothValues = getMultiSelectValues(instance, businessApp, "glba_data_type_selected_both");
                 var hasRequiredValue = hasValueInRange(bothValues, 1, 3);
@@ -209,28 +209,29 @@ HGC_ACDC_Utils.prototype = {
                 u_hipaa_hitech: fieldValues.u_hipaa_hitech
             };
 
-           if ((save && !appID) || (save && appID && businessApp == appID)) {
-        var app = new GlideRecord('cmdb_ci_business_app');
-        if (app.get(businessApp)) {
-            // Always update data fields
-            app.setValue('u_glba', fieldValues.u_glba);
-            app.setValue('u_sensitive', fieldValues.u_sensitive);
-            app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-            app.setValue('u_pci', fieldValues.u_pci);
-            app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+            if ((save && !appID) || (save && appID && businessApp == appID)) {
+                var app = new GlideRecord('cmdb_ci_business_app');
+                if (app.get(businessApp)) {
+                    // Always update data fields
+                    app.setValue('u_glba', fieldValues.u_glba);
+                    app.setValue('u_sensitive', fieldValues.u_sensitive);
+                    app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+                    app.setValue('u_pci', fieldValues.u_pci);
+                    app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
 
-            // Only update risk if explicitly told to AND it's currently "No" or empty
-            if (updateRisk !== false) {  // Default to true if not specified
-                var currentRisk = app.getValue('u_critical_application_risk');
-                if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
-                    var newRisk = getCriticalRiskFromLookup(app, fieldValues);
-                    app.setValue('u_critical_application_risk', newRisk);
+                    // Only update risk if explicitly told to AND it's currently "No" or empty
+                    // Default to true if updateRisk parameter not provided
+                    if (updateRisk !== false) {
+                        var currentRisk = app.getValue('u_critical_application_risk');
+                        if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
+                            var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+                            app.setValue('u_critical_application_risk', newRisk);
+                        }
+                    }
+
+                    app.update();
                 }
             }
-
-            app.update();
-        }
-    }
         });
 
         return answers;
