@@ -1,62 +1,28 @@
-(function executeRule(current, previous /*null when async*/ ) {
+(function executeRule(current, previous /*null when async*/) {
 
     var answers = new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, false);
     var businessApps = Object.keys(answers);
 
     businessApps.forEach(function(app) {
-        var canSave = false;
         var grCCBA = new GlideRecord('cmdb_ci_business_app');
         if (grCCBA.get(app)) {
             var field = "u_critical_application_risk";
             var previousRisk = grCCBA.getValue(field);
             var currentRisk = "";
 
-            // getting the query to find the value from the matrix
-var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
-query += "^u_sox=" + grCCBA.getValue("u_sox");
-
-var values = Object.keys(answers[app]);
-
-// Combine sensitive and sensitive_commercial before building query
-var sensitiveInt = parseInt(answers[app].u_sensitive, 10) || 0;
-var commercialInt = parseInt(answers[app].u_sensitive_commercial, 10) || 0;
-var hipaaInt = parseInt(answers[app].u_hipaa_hitech, 10) || 0;
-
-// Take the max of all three
-var maxSensitive = sensitiveInt;
-if (commercialInt > maxSensitive) maxSensitive = commercialInt;
-if (hipaaInt > maxSensitive) maxSensitive = hipaaInt;
-
-var combinedSensitive = maxSensitive.toString();
-
-values.forEach(function(key) {
-    if (key != "u_hipaa_hitech" && key != "u_sensitive_commercial") {
-        if (key == "u_sensitive") {
-            query += "^" + key + "=" + combinedSensitive;
-        } else {
-            query += "^" + key + "=" + answers[app][key];
-        }
-    }
-});
-
-// ADD THIS LINE TO SEE WHAT QUERY IS BEING BUILT
-gs.info("ACDC DEBUG - Query: " + query);
-gs.info("ACDC DEBUG - Combined Sensitive: " + combinedSensitive);
-gs.info("ACDC DEBUG - u_sensitive: " + answers[app].u_sensitive);
-gs.info("ACDC DEBUG - u_sensitive_commercial: " + answers[app].u_sensitive_commercial);
-
             // Simple logic: if any sensitive data exists, risk = Yes
-var hasGLBA = parseInt(answers[app].u_glba, 10) > 0;
-var hasSensitive = parseInt(answers[app].u_sensitive, 10) > 0;
-var hasCommercial = parseInt(answers[app].u_sensitive_commercial, 10) > 0;
-var hasPCI = parseInt(answers[app].u_pci, 10) > 0;
-var hasHIPAA = parseInt(answers[app].u_hipaa_hitech, 10) > 0;
+            var hasGLBA = parseInt(answers[app].u_glba, 10) > 0;
+            var hasSensitive = parseInt(answers[app].u_sensitive, 10) > 0;
+            var hasCommercial = parseInt(answers[app].u_sensitive_commercial, 10) > 0;
+            var hasPCI = parseInt(answers[app].u_pci, 10) > 0;
+            var hasHIPAA = parseInt(answers[app].u_hipaa_hitech, 10) > 0;
 
-if (hasGLBA || hasSensitive || hasCommercial || hasPCI || hasHIPAA) {
-    currentRisk = "Yes";
-} else {
-    currentRisk = "No";
-}
+            if (hasGLBA || hasSensitive || hasCommercial || hasPCI || hasHIPAA) {
+                currentRisk = "Yes";
+            } else {
+                currentRisk = "No";
+            }
+
             var riskChangedFromNoToYes = previousRisk == "No" && currentRisk == "Yes";
             var riskChangedFromYesToNo = (previousRisk == "Yes" || previousRisk == "YesRBAC") && currentRisk == "No";
 
