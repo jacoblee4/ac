@@ -45,18 +45,18 @@ gs.info("ACDC DEBUG - Combined Sensitive: " + combinedSensitive);
 gs.info("ACDC DEBUG - u_sensitive: " + answers[app].u_sensitive);
 gs.info("ACDC DEBUG - u_sensitive_commercial: " + answers[app].u_sensitive_commercial);
 
-            var grUCAL = new GlideRecord('u_critical_application_lookup');
-            grUCAL.addEncodedQuery(query);
-            grUCAL.query();
+            // Simple logic: if any sensitive data exists, risk = Yes
+var hasGLBA = parseInt(answers[app].u_glba, 10) > 0;
+var hasSensitive = parseInt(answers[app].u_sensitive, 10) > 0;
+var hasCommercial = parseInt(answers[app].u_sensitive_commercial, 10) > 0;
+var hasPCI = parseInt(answers[app].u_pci, 10) > 0;
+var hasHIPAA = parseInt(answers[app].u_hipaa_hitech, 10) > 0;
 
-            var rowCount = grUCAL.getRowCount();
-
-            if (grUCAL.next()) {
-                currentRisk = grUCAL.getValue("u_critical_application_risk");
-            } else {
-                currentRisk = "Yes";
-            }
-
+if (hasGLBA || hasSensitive || hasCommercial || hasPCI || hasHIPAA) {
+    currentRisk = "Yes";
+} else {
+    currentRisk = "No";
+}
             var riskChangedFromNoToYes = previousRisk == "No" && currentRisk == "Yes";
             var riskChangedFromYesToNo = (previousRisk == "Yes" || previousRisk == "YesRBAC") && currentRisk == "No";
 
