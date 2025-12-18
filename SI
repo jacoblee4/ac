@@ -29,19 +29,6 @@ HGC_ACDC_Utils.prototype = {
         }
     },
 
-    saveDataFieldsOnly: function(businessAppID, fieldValues) {
-        var app = new GlideRecord('cmdb_ci_business_app');
-        if (app.get(businessAppID)) {
-            app.setValue('u_glba', fieldValues.u_glba);
-            app.setValue('u_sensitive', fieldValues.u_sensitive);
-            app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-            app.setValue('u_pci', fieldValues.u_pci);
-            app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
-            // Explicitly do NOT touch u_critical_application_risk
-            app.update();
-        }
-    },
-
     saveAssessementToBusinessApps: function(current, save, appID, updateRisk) {
         var answers = {};
         var instance = current.getUniqueValue();
@@ -223,36 +210,35 @@ HGC_ACDC_Utils.prototype = {
             };
 
             if ((save && !appID) || (save && appID && businessApp == appID)) {
-                var app = new GlideRecord('cmdb_ci_business_app');
-                if (app.get(businessApp)) {
-                    // Always update data fields
-                    app.setValue('u_glba', fieldValues.u_glba);
-                    app.setValue('u_sensitive', fieldValues.u_sensitive);
-                    app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-                    app.setValue('u_pci', fieldValues.u_pci);
-                    app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+    var app = new GlideRecord('cmdb_ci_business_app');
+    if (app.get(businessApp)) {
+        // Always update data fields
+        app.setValue('u_glba', fieldValues.u_glba);
+        app.setValue('u_sensitive', fieldValues.u_sensitive);
+        app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+        app.setValue('u_pci', fieldValues.u_pci);
+        app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
 
-                    // Update risk field based on context
-                    if (updateRisk !== false) {
-                        var currentRisk = app.getValue('u_critical_application_risk');
-                        var newRisk = getCriticalRiskFromLookup(app, fieldValues);
-                        
-                        var isWorkflowCall = (typeof updateRisk === 'undefined');
-                        
-                        if (isWorkflowCall) {
-                            // Workflow call - update risk to calculated value
-                            app.setValue('u_critical_application_risk', newRisk);
-                        } else if (updateRisk === true) {
-                            // BR call - only update if currently No/empty, preserve Yes/YesRBAC
-                            if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
-                                app.setValue('u_critical_application_risk', newRisk);
-                            }
-                        }
-                    }
-
-                    app.update();
-                }
+        // Handle risk updates
+        var isWorkflowCall = (typeof updateRisk === 'undefined');
+        
+        if (isWorkflowCall) {
+            // Called from workflow - update risk to calculated value
+            var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+            app.setValue('u_critical_application_risk', newRisk);
+        } else if (updateRisk === true) {
+            // Called from BR - preserve Yes/YesRBAC, only update if No/empty
+            var currentRisk = app.getValue('u_critical_application_risk');
+            if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
+                var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+                app.setValue('u_critical_application_risk', newRisk);
             }
+        }
+        // If updateRisk === false, don't touch risk (not used anymore)
+
+        app.update();
+    }
+}
         });
 
         return answers;
