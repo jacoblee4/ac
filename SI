@@ -210,20 +210,27 @@ HGC_ACDC_Utils.prototype = {
             };
 
             if ((save && !appID) || (save && appID && businessApp == appID)) {
-                var app = new GlideRecord('cmdb_ci_business_app');
-                if (app.get(businessApp)) {
-                    app.setValue('u_glba', fieldValues.u_glba);
-                    app.setValue('u_sensitive', fieldValues.u_sensitive);
-                    app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-                    app.setValue('u_pci', fieldValues.u_pci);
-                    app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+    var app = new GlideRecord('cmdb_ci_business_app');
+    if (app.get(businessApp)) {
+        // Update data fields
+        app.setValue('u_glba', fieldValues.u_glba);
+        app.setValue('u_sensitive', fieldValues.u_sensitive);
+        app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+        app.setValue('u_pci', fieldValues.u_pci);
+        app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
 
-                    var newRisk = getCriticalRiskFromLookup(app, fieldValues);
-                    app.setValue('u_critical_application_risk', newRisk);
+        // Only update critical risk if it's currently "No" or empty
+        // Preserve "Yes" or "YesRBAC" values (they can only change via approval)
+        var currentRisk = app.getValue('u_critical_application_risk');
+        if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
+            var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+            app.setValue('u_critical_application_risk', newRisk);
+        }
+        // If currentRisk is "Yes" or "YesRBAC", leave it unchanged
 
-                    app.update();
-                }
-            }
+        app.update();
+    }
+}
         });
 
         return answers;
