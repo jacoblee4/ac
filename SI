@@ -210,28 +210,32 @@ HGC_ACDC_Utils.prototype = {
             };
 
             if ((save && !appID) || (save && appID && businessApp == appID)) {
-                var app = new GlideRecord('cmdb_ci_business_app');
-                if (app.get(businessApp)) {
-                    // Always update data fields
-                    app.setValue('u_glba', fieldValues.u_glba);
-                    app.setValue('u_sensitive', fieldValues.u_sensitive);
-                    app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-                    app.setValue('u_pci', fieldValues.u_pci);
-                    app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+    var app = new GlideRecord('cmdb_ci_business_app');
+    if (app.get(businessApp)) {
+        // Always update data fields
+        app.setValue('u_glba', fieldValues.u_glba);
+        app.setValue('u_sensitive', fieldValues.u_sensitive);
+        app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+        app.setValue('u_pci', fieldValues.u_pci);
+        app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
 
-                    // Only update risk if explicitly told to AND it's currently "No" or empty
-                    // Default to true if updateRisk parameter not provided
-                    if (updateRisk !== false) {
-                        var currentRisk = app.getValue('u_critical_application_risk');
-                        if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
-                            var newRisk = getCriticalRiskFromLookup(app, fieldValues);
-                            app.setValue('u_critical_application_risk', newRisk);
-                        }
-                    }
-
-                    app.update();
-                }
+        // Handle risk field updates
+        if (updateRisk !== false) {
+            var currentRisk = app.getValue('u_critical_application_risk');
+            var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+            
+            // Allow updates in these cases:
+            // 1. Current is "No" or empty -> can become "Yes"
+            // 2. New calculated risk is "No" -> always allow downgrade to "No"
+            if (currentRisk == "No" || currentRisk == "" || currentRisk == null || newRisk == "No") {
+                app.setValue('u_critical_application_risk', newRisk);
             }
+            // Otherwise preserve "Yes" or "YesRBAC" when data changes but stays critical
+        }
+
+        app.update();
+    }
+}
         });
 
         return answers;
