@@ -30,7 +30,7 @@
                 //generate the req
                 new HGC_ACDC_Utils().generateRBACRequest(app, current.sys_id, currentRisk);
             } else {
-                //save
+                //save - this preserves Yes/YesRBAC when data changes
                 new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, true, app);
             }
         }
