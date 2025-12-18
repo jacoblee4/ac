@@ -209,28 +209,28 @@ HGC_ACDC_Utils.prototype = {
                 u_hipaa_hitech: fieldValues.u_hipaa_hitech
             };
 
-            if ((save && !appID) || (save && appID && businessApp == appID)) {
-    var app = new GlideRecord('cmdb_ci_business_app');
-    if (app.get(businessApp)) {
-        // Update data fields
-        app.setValue('u_glba', fieldValues.u_glba);
-        app.setValue('u_sensitive', fieldValues.u_sensitive);
-        app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
-        app.setValue('u_pci', fieldValues.u_pci);
-        app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
+           if ((save && !appID) || (save && appID && businessApp == appID)) {
+        var app = new GlideRecord('cmdb_ci_business_app');
+        if (app.get(businessApp)) {
+            // Always update data fields
+            app.setValue('u_glba', fieldValues.u_glba);
+            app.setValue('u_sensitive', fieldValues.u_sensitive);
+            app.setValue('u_sensitive_commercial', fieldValues.u_sensitive_commercial);
+            app.setValue('u_pci', fieldValues.u_pci);
+            app.setValue('u_hipaa_hitech', fieldValues.u_hipaa_hitech);
 
-        // Only update critical risk if it's currently "No" or empty
-        // Preserve "Yes" or "YesRBAC" values (they can only change via approval)
-        var currentRisk = app.getValue('u_critical_application_risk');
-        if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
-            var newRisk = getCriticalRiskFromLookup(app, fieldValues);
-            app.setValue('u_critical_application_risk', newRisk);
+            // Only update risk if explicitly told to AND it's currently "No" or empty
+            if (updateRisk !== false) {  // Default to true if not specified
+                var currentRisk = app.getValue('u_critical_application_risk');
+                if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
+                    var newRisk = getCriticalRiskFromLookup(app, fieldValues);
+                    app.setValue('u_critical_application_risk', newRisk);
+                }
+            }
+
+            app.update();
         }
-        // If currentRisk is "Yes" or "YesRBAC", leave it unchanged
-
-        app.update();
     }
-}
         });
 
         return answers;
