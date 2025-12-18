@@ -27,10 +27,12 @@
             var riskChangedFromYesToNo = (previousRisk == "Yes" || previousRisk == "YesRBAC") && currentRisk == "No";
 
             if (riskChangedFromNoToYes || riskChangedFromYesToNo) {
-                //generate the req - task will handle everything after approval
+                //generate the req
                 new HGC_ACDC_Utils().generateRBACRequest(app, current.sys_id, currentRisk);
+                // Save data fields but skip risk field - workflow will handle it
+                new HGC_ACDC_Utils().saveDataFieldsOnly(app, answers[app]);
             } else {
-                //save - no risk change, just update data fields
+                //save - no risk change, update data fields and preserve Yes/YesRBAC
                 new HGC_ACDC_Utils().saveAssessementToBusinessApps(current, true, app, true);
             }
         }
