@@ -224,13 +224,17 @@ HGC_ACDC_Utils.prototype = {
             var currentRisk = app.getValue('u_critical_application_risk');
             var newRisk = getCriticalRiskFromLookup(app, fieldValues);
             
-            // Allow updates in these cases:
-            // 1. Current is "No" or empty -> can become "Yes"
-            // 2. New calculated risk is "No" -> always allow downgrade to "No"
-            if (currentRisk == "No" || currentRisk == "" || currentRisk == null || newRisk == "No") {
+            var isWorkflowCall = (typeof updateRisk === 'undefined');
+            
+            if (isWorkflowCall) {
+                // Workflow call - always update risk
                 app.setValue('u_critical_application_risk', newRisk);
+            } else if (updateRisk === true) {
+                // BR call - only update if currently No/empty
+                if (currentRisk == "No" || currentRisk == "" || currentRisk == null) {
+                    app.setValue('u_critical_application_risk', newRisk);
+                }
             }
-            // Otherwise preserve "Yes" or "YesRBAC" when data changes but stays critical
         }
 
         app.update();
