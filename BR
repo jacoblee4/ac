@@ -39,6 +39,12 @@ values.forEach(function(key) {
     }
 });
 
+// ADD THIS LINE TO SEE WHAT QUERY IS BEING BUILT
+gs.info("ACDC DEBUG - Query: " + query);
+gs.info("ACDC DEBUG - Combined Sensitive: " + combinedSensitive);
+gs.info("ACDC DEBUG - u_sensitive: " + answers[app].u_sensitive);
+gs.info("ACDC DEBUG - u_sensitive_commercial: " + answers[app].u_sensitive_commercial);
+
             var grUCAL = new GlideRecord('u_critical_application_lookup');
             grUCAL.addEncodedQuery(query);
             grUCAL.query();
