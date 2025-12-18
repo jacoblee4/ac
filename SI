@@ -89,32 +89,40 @@ HGC_ACDC_Utils.prototype = {
             return maxInt.toString();
         }
 
-        function getCriticalRiskFromLookup(grCCBA, fieldValues) {
+       function getCriticalRiskFromLookup(grCCBA, fieldValues) {
     // Combine sensitive, sensitive_commercial, and hipaa_hitech
     var sensitiveInt = parseInt(fieldValues.u_sensitive, 10) || 0;
     var commercialInt = parseInt(fieldValues.u_sensitive_commercial, 10) || 0;
     var hipaaInt = parseInt(fieldValues.u_hipaa_hitech, 10) || 0;
     
     // Take the max of all three
-    var maxSensitive = sensitiveInt;
-    if (commercialInt > maxSensitive) maxSensitive = commercialInt;
-    if (hipaaInt > maxSensitive) maxSensitive = hipaaInt;
+    var maxSensitiveInt = sensitiveInt;
+    if (commercialInt > maxSensitiveInt) maxSensitiveInt = commercialInt;
+    if (hipaaInt > maxSensitiveInt) maxSensitiveInt = hipaaInt;
     
-    var combinedSensitive = maxSensitive.toString();
+    var combinedSensitive = maxSensitiveInt.toString();
+    
+    gs.info("SI DEBUG - u_sensitive: " + fieldValues.u_sensitive);
+    gs.info("SI DEBUG - u_sensitive_commercial: " + fieldValues.u_sensitive_commercial);
+    gs.info("SI DEBUG - Combined Sensitive: " + combinedSensitive);
     
     var query = "u_rbac_exempt=" + grCCBA.getValue("u_rbac_exempt");
     query += "^u_sox=" + grCCBA.getValue("u_sox");
     query += "^u_glba=" + fieldValues.u_glba;
     query += "^u_sensitive=" + combinedSensitive;
     query += "^u_pci=" + fieldValues.u_pci;
+    
+    gs.info("SI DEBUG - Query: " + query);
 
     var grUCAL = new GlideRecord('u_critical_application_lookup');
     grUCAL.addEncodedQuery(query);
     grUCAL.query();
 
     if (grUCAL.next()) {
+        gs.info("SI DEBUG - Match found, risk: " + grUCAL.getValue("u_critical_application_risk"));
         return grUCAL.getValue("u_critical_application_risk");
     } else {
+        gs.info("SI DEBUG - No match found, defaulting to Yes");
         return "Yes";
     }
 }
