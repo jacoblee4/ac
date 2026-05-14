@@ -1,1 +1,21 @@
+Let's start over. how would you develop all of this complixity for my catalog item:
+Requestor - defaults to logged in user - read only
+Request Type Add/Remove
+opened for - open to users table
+the above three fields always show.
 
+If request type = add new field 'is this for a branch' appears with yes/no
+If yes this is a branch a branch field appears
+once a branch is selected a label with checkboxes appear for lobby, vault, atm, office, emergency List
+if emergency list appears a field to enter phone numbers appears.
+
+if branch is no a field for region appears
+if region is filled out a field for building appears
+once building is entered the checkboxes appear but just lobby and emergency List
+the emergency list still shows the phone number field if checked.
+
+if request type is remove a field for removal type is shown with just 2 options
+ if type is remove and an opened for is entered another field that points to a reference table appears that is filtered with the user in the opened for so if they have 1 or more records on the table this is a drop down to select the record belonging to that user (only 1 choice).
+ Ideally if they choose remove and a user and no records are found instead of this field above lets' call it users location will not appear and instead a message saying this user has no locations to remove.
+ 
+ what is the best way to solve all of this logic because right now I'm using some UI policies and ui scripts but there are issues like if the user selects add, branch, selects a branch, then changes to not a branch and chooses a building the branch is still there just the field is hidden now. I want any fields data that is not hidden to be empty and I want the hiding/showing of fields to be seemless.
